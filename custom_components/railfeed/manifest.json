@@ -1,6 +1,7 @@
 {
   "domain": "railfeed",
   "name": "RailFeed",
+  "categories": ["vehicles_transport"],
   "codeowners": ["@torstenknoefel"],
   "config_flow": true,
   "documentation": "https://github.com/torstenknoefel/ha-railfeed",
