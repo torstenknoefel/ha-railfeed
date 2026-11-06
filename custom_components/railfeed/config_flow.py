@@ -22,6 +22,7 @@ from .api import (
 )
 from .board import _tidy
 from .const import (
+    CONF_CALLING_AT,
     CONF_DESTINATIONS,
     CONF_HOURS,
     CONF_MAX_DEPARTURES,
@@ -34,7 +35,7 @@ from .const import (
     DOMAIN,
     MIN_SCAN_INTERVAL,
 )
-from .coordinator import parse_crs_list
+from .coordinator import parse_crs, parse_crs_list
 
 CRS_RE = re.compile(r"^[A-Za-z]{3}$")
 
@@ -138,15 +139,23 @@ class RailFeedOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             destinations = parse_crs_list(user_input.get(CONF_DESTINATIONS))
+            calling_at = parse_crs(user_input.get(CONF_CALLING_AT))
+            station = self.config_entry.data[CONF_STATION]
             if destinations is None:
                 errors[CONF_DESTINATIONS] = "invalid_destinations"
+            elif calling_at is None or calling_at == station:
+                errors[CONF_CALLING_AT] = "invalid_calling_at"
             else:
-                return self.async_create_entry(
-                    data={
-                        **user_input,
-                        CONF_DESTINATIONS: ", ".join(sorted(destinations)),
-                    }
-                )
+                if calling_at:
+                    errors.update(await self._check_calling_at(station, calling_at))
+                if not errors:
+                    return self.async_create_entry(
+                        data={
+                            **user_input,
+                            CONF_DESTINATIONS: ", ".join(sorted(destinations)),
+                            CONF_CALLING_AT: calling_at,
+                        }
+                    )
 
         opts = self.config_entry.options
         schema = vol.Schema(
@@ -167,9 +176,26 @@ class RailFeedOptionsFlow(OptionsFlow):
                     default=opts.get(CONF_PASSENGER_ONLY, DEFAULT_PASSENGER_ONLY),
                 ): bool,
                 vol.Optional(
+                    CONF_CALLING_AT,
+                    description={"suggested_value": opts.get(CONF_CALLING_AT, "")},
+                ): str,
+                vol.Optional(
                     CONF_DESTINATIONS,
                     description={"suggested_value": opts.get(CONF_DESTINATIONS, "")},
                 ): str,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+
+    async def _check_calling_at(self, station: str, calling_at: str) -> dict[str, str]:
+        """Make sure RailFeed knows the station; return form errors, if any."""
+        client = RailFeedClient(
+            async_get_clientsession(self.hass), self.config_entry.data[CONF_API_KEY]
+        )
+        try:
+            await client.async_get_services(station, calling_at)
+        except RailFeedNotFoundError:
+            return {CONF_CALLING_AT: "invalid_calling_at"}
+        except RailFeedError as err:
+            return {"base": _error_key(err)}
+        return {}

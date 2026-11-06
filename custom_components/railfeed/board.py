@@ -4,6 +4,7 @@ Deliberately has no Home Assistant imports so it can be unit tested on its own.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, tzinfo
 import string
@@ -44,6 +45,61 @@ def _parse_uk_datetime(value: str | None, tz: tzinfo) -> datetime | None:
 
 
 @dataclass(frozen=True)
+class CallingInfo:
+    """What we know about a train's call at the configured 'calling at' station."""
+
+    arrival: str | None  # advertised arrival, "HH:MM"
+    journey_mins: int | None
+
+
+def parse_calling_services(raw: dict[str, Any]) -> dict[str, CallingInfo]:
+    """Turn a /api/services response into {schedule uid: CallingInfo}.
+
+    Only trains that genuinely stop at both stations count: a train that merely
+    passes the destination, or has an operational-only stop there, does not serve it.
+    """
+    result: dict[str, CallingInfo] = {}
+    for item in raw.get("services") or []:
+        uid = item.get("uid")
+        if not uid or item.get("to_is_pass") or item.get("from_is_pass"):
+            continue
+        public = item.get("to_public_arrival")
+        if public is None and "to_public_arrival" in item:
+            continue  # no public call at the destination
+        stamp = public or item.get("to_arrival")
+        journey = item.get("journey_mins")
+        result[uid] = CallingInfo(
+            arrival=stamp[:5] if stamp else None,
+            journey_mins=int(journey) if isinstance(journey, (int, float)) else None,
+        )
+    return result
+
+
+def base_date_of(raw: dict[str, Any], now: datetime, tz: tzinfo) -> date:
+    """The service date a live_board response is for."""
+    try:
+        return date.fromisoformat(raw["date"])
+    except (KeyError, TypeError, ValueError):
+        return now.astimezone(tz).date()
+
+
+def service_dates(base: date, now: datetime, tz: tzinfo, hours: int) -> list[date]:
+    """Schedule dates whose trains can appear on the board.
+
+    A train's schedule belongs to the day it started, so just after midnight the
+    board holds trains from yesterday's schedule, and a window reaching past
+    midnight holds trains from tomorrow's.
+    """
+    local_now = now.astimezone(tz)
+    dates = {base}
+    if local_now.hour < 6:
+        dates.add(base - timedelta(days=1))
+    if (local_now + timedelta(hours=hours)).date() > local_now.date():
+        dates.add(base + timedelta(days=1))
+    return sorted(dates)
+
+
+@dataclass(frozen=True)
 class Service:
     """One departure from the station."""
 
@@ -63,6 +119,8 @@ class Service:
     cancel_reason: str | None
     late_reason: str | None
     coaches: int | None
+    calling_at_arrival: str | None = None
+    journey_minutes: int | None = None
 
     @property
     def cancelled(self) -> bool:
@@ -87,6 +145,8 @@ class Service:
             "cancel_reason": self.cancel_reason,
             "late_reason": self.late_reason,
             "coaches": self.coaches,
+            "calling_at_arrival": self.calling_at_arrival,
+            "journey_minutes": self.journey_minutes,
             "service_uid": self.uid,
         }
 
@@ -97,6 +157,7 @@ class BoardData:
 
     station: str
     services: list[Service]
+    calling_at: str | None = None
 
     @property
     def next_service(self) -> Service | None:
@@ -120,6 +181,7 @@ def _parse_service(
     now: datetime,
     passenger_only: bool,
     destinations: frozenset[str],
+    calling: Mapping[str, CallingInfo] | None = None,
 ) -> Service | None:
     # Things that never belong on a departure board.
     if item.get("is_pass") or item.get("stale") or item.get("reached_destination"):
@@ -139,6 +201,12 @@ def _parse_service(
     destination_crs = item.get("destination_crs")
     if destinations and destination_crs not in destinations:
         return None
+
+    calling_info: CallingInfo | None = None
+    if calling is not None:
+        calling_info = calling.get(item.get("uid"))
+        if calling_info is None:  # train doesn't call at the configured station
+            return None
 
     sched_t = _parse_time(item.get("public_departure")) or _parse_time(
         item.get("scheduled_departure")
@@ -212,6 +280,8 @@ def _parse_service(
         # "Check the delay before showing it": reasons linger on recovered trains.
         late_reason=item.get("late_reason") if delay >= DELAY_THRESHOLD_MINS else None,
         coaches=coaches,
+        calling_at_arrival=calling_info.arrival if calling_info else None,
+        journey_minutes=calling_info.journey_mins if calling_info else None,
     )
 
 
@@ -223,13 +293,15 @@ def parse_board(
     max_departures: int,
     passenger_only: bool,
     destinations: frozenset[str],
+    calling: Mapping[str, CallingInfo] | None = None,
+    calling_at: str | None = None,
 ) -> BoardData:
-    """Turn a raw live_board response into a BoardData."""
+    """Turn a raw live_board response into a BoardData.
+
+    With ``calling`` set, only trains whose schedule uid is in it are kept.
+    """
     station = _tidy(raw.get("station")) or "Station"
-    try:
-        base_date = date.fromisoformat(raw["date"])
-    except (KeyError, TypeError, ValueError):
-        base_date = now.astimezone(tz).date()
+    base_date = base_date_of(raw, now, tz)
 
     services: list[Service] = []
     for item in raw.get("services") or []:
@@ -240,6 +312,7 @@ def parse_board(
             now=now,
             passenger_only=passenger_only,
             destinations=destinations,
+            calling=calling,
         )
         if service is None:
             continue
@@ -247,4 +320,4 @@ def parse_board(
         if len(services) >= max_departures:
             break
 
-    return BoardData(station=station, services=services)
+    return BoardData(station=station, services=services, calling_at=calling_at)

@@ -42,6 +42,15 @@ class RailFeedClient:
             "live_board", {"crs": crs, "hours": hours, "type": "departures"}
         )
 
+    async def async_get_services(
+        self, from_crs: str, to_crs: str, day: str | None = None
+    ) -> dict[str, Any]:
+        """Return scheduled direct services calling at both stations, in that order."""
+        params: dict[str, Any] = {"from": from_crs, "to": to_crs}
+        if day:
+            params["date"] = day
+        return await self._get("services", params)
+
     async def _get(self, endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
         headers = {"X-Api-Key": self._api_key, "Accept": "application/json"}
         try:

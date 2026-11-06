@@ -38,18 +38,25 @@
           "max_departures": "Departures to keep",
           "hours": "Look-ahead window (hours)",
           "passenger_only": "Passenger trains only",
+          "calling_at": "Only trains calling at this station",
           "destinations": "Only trains to these destinations"
         },
         "data_description": {
           "scan_interval": "Minimum 30. RailFeed's feeds don't update faster than that.",
           "max_departures": "How many upcoming departures to include in the 'departures' attribute.",
           "passenger_only": "Hides freight, empty stock and charters.",
+          "calling_at": "Optional. Three-letter CRS code of a station on the train's route, e.g. YRK. Only trains that stop there after this station are listed, whether or not it is their final destination. Leave blank for all.",
           "destinations": "Optional. Comma-separated CRS codes of the train's final destination, e.g. KGX, EDB. Leave blank for all."
         }
       }
     },
     "error": {
-      "invalid_destinations": "Use comma-separated three-letter CRS codes, e.g. KGX, EDB."
+      "invalid_destinations": "Use comma-separated three-letter CRS codes, e.g. KGX, EDB.",
+      "invalid_calling_at": "Enter a single three-letter CRS code that RailFeed knows, different from this station.",
+      "invalid_auth": "That API key was rejected.",
+      "cannot_connect": "Couldn't reach RailFeed.",
+      "rate_limited": "RailFeed rate limit reached. Try again in a minute.",
+      "unknown": "Unexpected error talking to RailFeed."
     }
   },
   "entity": {

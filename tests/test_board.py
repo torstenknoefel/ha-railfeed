@@ -97,3 +97,68 @@ def test_options_passenger_destination_limit():
     assert [s.uid for s in parse(passenger_only=False, destinations=frozenset({"KGX"})).services] \
         == ["A1", "A4", "A5"]
     assert len(parse(max_departures=2).services) == 2
+
+
+SERVICES_RAW = {
+    "services": [
+        # calls at the destination
+        {"uid": "A1", "from_is_pass": False, "to_is_pass": False,
+         "to_public_arrival": "19:21:00", "to_arrival": "19:20:30", "journey_mins": 78},
+        # passes the destination without stopping
+        {"uid": "A3", "from_is_pass": False, "to_is_pass": True,
+         "to_public_arrival": None, "to_arrival": None, "journey_mins": 60},
+        # operational stop only: not advertised to the public
+        {"uid": "A4", "from_is_pass": False, "to_is_pass": False,
+         "to_public_arrival": None, "to_arrival": "01:10:00", "journey_mins": 70},
+        {"uid": "A5", "from_is_pass": False, "to_is_pass": False,
+         "to_public_arrival": "01:25:00", "journey_mins": 65},
+        # not on the board at all
+        {"uid": "ZZ9", "from_is_pass": False, "to_is_pass": False,
+         "to_public_arrival": "18:30:00", "journey_mins": 30},
+    ]
+}
+
+
+def test_parse_calling_services_only_real_calls():
+    calling = board.parse_calling_services(SERVICES_RAW)
+    assert set(calling) == {"A1", "A5", "ZZ9"}
+    assert calling["A1"].arrival == "19:21" and calling["A1"].journey_mins == 78
+
+
+def test_calling_filter_keeps_only_trains_serving_station():
+    calling = board.parse_calling_services(SERVICES_RAW)
+    data = parse(calling=calling, calling_at="YRK")
+    assert [s.uid for s in data.services] == ["A1", "A5"]
+    assert data.calling_at == "YRK"
+    first = data.services[0]
+    assert first.calling_at_arrival == "19:21" and first.journey_minutes == 78
+    assert first.as_dict()["calling_at_arrival"] == "19:21"
+
+
+def test_calling_filter_serves_non_final_destination():
+    # A1's final destination is King's Cross; the filter is about the route, so a
+    # station other than KGX still matches as long as the train calls there.
+    calling = {"A2": board.CallingInfo("18:40", 40)}
+    data = parse(calling=calling)
+    assert [s.uid for s in data.services] == ["A2"]  # cancelled trains still listed
+
+
+def test_empty_calling_set_lists_nothing_but_none_means_no_filter():
+    assert parse(calling={}).services == []
+    assert len(parse(calling=None).services) == 5
+
+
+def test_calling_filter_combines_with_max_departures():
+    calling = board.parse_calling_services(SERVICES_RAW)
+    assert len(parse(calling=calling, max_departures=1).services) == 1
+
+
+def test_service_dates_around_midnight():
+    from datetime import date
+    base = date(2026, 11, 6)
+    assert board.service_dates(base, NOW, TZ, 2) == [base]
+    # 17:50 + 7h crosses midnight, so tomorrow's schedules matter too
+    assert board.service_dates(base, NOW, TZ, 7) == [base, date(2026, 11, 7)]
+    # just after midnight the board still holds yesterday's late trains
+    early = datetime(2026, 11, 6, 0, 30, tzinfo=timezone.utc)
+    assert board.service_dates(base, early, TZ, 2) == [date(2026, 11, 5), base]

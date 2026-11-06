@@ -39,6 +39,8 @@ def _next_attr(board: BoardData, getter: Callable[[Any], Any]) -> Any:
 
 def _next_departure_attrs(board: BoardData) -> dict[str, Any]:
     attrs: dict[str, Any] = {"station": board.station}
+    if board.calling_at:
+        attrs["calling_at"] = board.calling_at
     service = board.next_service
     if service:
         attrs.update(service.as_dict())

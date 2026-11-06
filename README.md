@@ -46,7 +46,12 @@ It is excluded from the recorder database.
   limit is 60 requests/min per key).
 - **Departures to keep** (default 10), **look-ahead window** (default 2 h).
 - **Passenger trains only** (default on): hides freight, empty stock and charters.
+- **Only trains calling at this station**: optional CRS code of any station on the train's route, e.g. `YRK`.
+  Only trains that stop there *after* your station are listed, whether or not it is their final destination.
+  Each train also gets `calling_at_arrival` (advertised arrival time there) and `journey_minutes` attributes.
+  This costs one extra API request per 15 minutes (the answer is cached), well inside the rate limit.
 - **Destination filter**: optional CRS codes of the train's *final* destination, e.g. `KGX, EDB`.
+  Can be combined with the option above.
 
 ## Dashboard card
 
@@ -86,6 +91,9 @@ action:
 ## Notes
 
 - A train counts as "delayed" at 1+ minutes late (`DELAY_THRESHOLD_MINS` in `board.py`).
+- "Calling at" uses the *scheduled* timetable (RailFeed's `/api/services`), so a train added at very short
+  notice may not appear until that timetable lookup refreshes, and a train that skips the station today
+  because of disruption still shows.
 - Platforms the operator has asked to keep off public screens are hidden.
 - Data is attributed to RailFeed; not affiliated with National Rail.
 
