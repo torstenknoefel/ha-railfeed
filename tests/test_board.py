@@ -1,0 +1,99 @@
+"""Tests for the pure-Python board parser (no Home Assistant needed)."""
+from datetime import datetime, timezone
+import importlib.util
+from pathlib import Path
+import sys
+from zoneinfo import ZoneInfo
+
+_path = Path(__file__).parent.parent / "custom_components" / "railfeed" / "board.py"
+_spec = importlib.util.spec_from_file_location("railfeed_board", _path)
+board = importlib.util.module_from_spec(_spec)
+sys.modules["railfeed_board"] = board
+_spec.loader.exec_module(board)
+
+TZ = ZoneInfo("Europe/London")
+NOW = datetime(2026, 11, 6, 17, 50, tzinfo=timezone.utc)  # 17:50 UK (GMT)
+
+RAW = {
+    "station": "LEEDS",
+    "date": "2026-11-06",
+    "services": [
+        {"uid": "A1", "headcode": "1D20", "toc_type": "PASSENGER", "toc_name": "LNER",
+         "destination": "LONDON KINGS CROSS", "destination_crs": "KGX", "origin": "LEEDS",
+         "public_departure": "17:55:00", "scheduled_departure": "17:54:30", "platform": "3",
+         "live_platform": "6", "live_platform_confirmed": True,
+         "projected_departure": "18:03:00", "projected_delay_mins": 8,
+         "late_reason": "Delayed by a signalling fault", "status": "expected",
+         "formation": {"total_coaches": 9}},
+        {"uid": "A2", "headcode": "1P05", "toc_type": "PASSENGER", "toc_name": "Northern",
+         "destination": "YORK", "destination_crs": "YRK", "public_departure": "18:00:00",
+         "platform": "8", "status": "cancelled", "cancel_type": "EN ROUTE",
+         "cancel_reason": "A train fault"},
+        {"uid": "F1", "headcode": "6E11", "toc_type": "FREIGHT", "destination": "DRAX",
+         "scheduled_departure": "18:01:00", "status": "expected"},
+        {"uid": "E1", "headcode": "5Z88", "toc_type": "PASSENGER", "destination": "NEVILLE HILL",
+         "scheduled_departure": "18:05:00", "status": "expected"},
+        {"uid": "P1", "headcode": "1A00", "toc_type": "PASSENGER", "destination": "X",
+         "public_departure": "17:45:00", "status": "passed"},
+        {"uid": "A3", "headcode": "1S33", "toc_type": "PASSENGER", "toc_name": "LNER",
+         "destination": "EDINBURGH", "destination_crs": "EDB", "public_departure": "18:10:00",
+         "platform": "4", "live_platform": "4", "live_platform_suppressed": True,
+         "delay_mins": 0, "status": "expected"},
+        {"uid": "A4", "headcode": "1K10", "toc_type": "PASSENGER",
+         "destination": "LONDON KINGS CROSS", "destination_crs": "KGX",
+         "public_departure": "23:58:00", "projected_departure": "00:03:00",
+         "projected_delay_mins": 5, "platform": "2", "status": "expected"},
+        {"uid": "A5", "headcode": "1K11", "toc_type": "PASSENGER",
+         "destination": "LONDON KINGS CROSS", "destination_crs": "KGX",
+         "public_departure": "00:20:00", "platform": "2", "status": "expected"},
+    ],
+}
+
+
+def parse(**kw):
+    args = dict(tz=TZ, now=NOW, max_departures=10, passenger_only=True,
+                destinations=frozenset())
+    args.update(kw)
+    return board.parse_board(RAW, **args)
+
+
+def test_filters_freight_stock_and_departed():
+    assert [s.uid for s in parse().services] == ["A1", "A2", "A3", "A4", "A5"]
+
+
+def test_station_name_tidied():
+    assert parse().station == "Leeds"
+    assert parse().services[0].destination == "London Kings Cross"
+
+
+def test_delayed_service_uses_projection_and_platform_change():
+    s = parse().services[0]
+    assert s.status == "delayed" and s.delay_minutes == 8
+    assert s.expected.strftime("%H:%M") == "18:03"
+    assert s.platform == "6" and s.platform_changed
+    assert s.late_reason and s.coaches == 9
+
+
+def test_cancelled_and_next_service():
+    data = parse()
+    assert data.services[1].status == "cancelled"
+    assert data.services[1].cancel_reason == "A train fault"
+    assert data.next_service.uid == "A1"
+    assert (data.delayed_count, data.cancelled_count) == (2, 1)
+
+
+def test_suppressed_platform_hidden():
+    assert parse().services[2].platform is None
+
+
+def test_midnight_rollover_of_expected_time():
+    s = parse().services[3]
+    assert s.scheduled.day == 6 and s.expected.day == 7
+    assert s.expected.strftime("%H:%M") == "00:03"
+    assert parse().services[4].scheduled.day == 7
+
+
+def test_options_passenger_destination_limit():
+    assert [s.uid for s in parse(passenger_only=False, destinations=frozenset({"KGX"})).services] \
+        == ["A1", "A4", "A5"]
+    assert len(parse(max_departures=2).services) == 2

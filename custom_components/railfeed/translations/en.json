@@ -1,0 +1,66 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to RailFeed",
+        "description": "Create a free API key on your RailFeed account's API Keys page (railfeed.co.uk/api-keys), then enter the three-letter station code (CRS), e.g. LDS for Leeds or KGX for London King's Cross.",
+        "data": {
+          "api_key": "API key",
+          "station": "Station code (CRS)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate RailFeed",
+        "description": "The API key for {station} was rejected. Enter a new key from railfeed.co.uk/api-keys.",
+        "data": {
+          "api_key": "API key"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "That API key was rejected.",
+      "invalid_station": "RailFeed doesn't recognise that station code. Use the three-letter CRS code.",
+      "cannot_connect": "Couldn't reach RailFeed.",
+      "rate_limited": "RailFeed rate limit reached. Try again in a minute.",
+      "unknown": "Unexpected error talking to RailFeed."
+    },
+    "abort": {
+      "already_configured": "That station is already set up.",
+      "reauth_successful": "API key updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "RailFeed options",
+        "data": {
+          "scan_interval": "Update interval (seconds)",
+          "max_departures": "Departures to keep",
+          "hours": "Look-ahead window (hours)",
+          "passenger_only": "Passenger trains only",
+          "destinations": "Only trains to these destinations"
+        },
+        "data_description": {
+          "scan_interval": "Minimum 30. RailFeed's feeds don't update faster than that.",
+          "max_departures": "How many upcoming departures to include in the 'departures' attribute.",
+          "passenger_only": "Hides freight, empty stock and charters.",
+          "destinations": "Optional. Comma-separated CRS codes of the train's final destination, e.g. KGX, EDB. Leave blank for all."
+        }
+      }
+    },
+    "error": {
+      "invalid_destinations": "Use comma-separated three-letter CRS codes, e.g. KGX, EDB."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "next_departure": {"name": "Next departure"},
+      "next_destination": {"name": "Next destination"},
+      "next_platform": {"name": "Next platform"},
+      "next_delay": {"name": "Next delay"},
+      "next_status": {"name": "Next status"},
+      "delayed_services": {"name": "Delayed services"},
+      "cancelled_services": {"name": "Cancelled services"}
+    }
+  }
+}

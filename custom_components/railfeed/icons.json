@@ -1,0 +1,13 @@
+{
+  "entity": {
+    "sensor": {
+      "next_departure": {"default": "mdi:train"},
+      "next_destination": {"default": "mdi:map-marker-right"},
+      "next_platform": {"default": "mdi:sign-direction"},
+      "next_delay": {"default": "mdi:clock-alert-outline"},
+      "next_status": {"default": "mdi:train-variant"},
+      "delayed_services": {"default": "mdi:clock-alert"},
+      "cancelled_services": {"default": "mdi:train-car-passenger-door-open"}
+    }
+  }
+}
