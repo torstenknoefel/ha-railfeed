@@ -31,13 +31,13 @@ Copy `custom_components/railfeed` into your HA config folder's `custom_component
 1. Create a free account at <https://railfeed.co.uk>, then copy your key from
    <https://railfeed.co.uk/api-keys>.
 2. **Settings → Devices & services → Add integration → RailFeed**. Enter the key and the
-   three-letter station (CRS) code, e.g. `LDS` (Leeds), `KGX` (King's Cross), `WIM` (Wimbledon).
+   three-letter station (CRS) code, e.g. `BVD` (Belvedere), `KGX` (King's Cross), `WIM` (Wimbledon).
    Optionally add a **calling at** station (see below).
 
 Add the integration again for each extra station, or for the same station with a different
 **calling at** station (one entry per station + destination pair; the same key can be reused).
-For example `LDS` calling at `YRK` and `LDS` calling at `MAN` give two separate devices,
-"Leeds to York" and "Leeds to Manchester Piccadilly", each with its own sensors.
+For example `BVD` calling at `AWD` and `BVD` calling at `GNW` give two separate devices,
+"Belvedere to Abbey Wood" and "Belvedere to Greenwich", each with its own sensors.
 
 ## Entities (per station)
 
@@ -57,7 +57,7 @@ It is excluded from the recorder database.
   limit is 60 requests/min per key).
 - **Departures to keep** (default 10), **look-ahead window** (default 2 h).
 - **Passenger trains only** (default on): hides freight, empty stock and charters.
-- **Only trains calling at this station**: optional CRS code of any station on the train's route, e.g. `YRK`.
+- **Only trains calling at this station**: optional CRS code of any station on the train's route, e.g. `AWD`.
   Chosen when you add the entry (it is what makes the entry unique); to change it, add a new entry and remove the old one.
   (Entries created with v0.2.x keep it here in the options.)
   Only trains that stop there *after* your station are listed, whether or not it is their final destination.
@@ -65,11 +65,11 @@ It is excluded from the recorder database.
   This costs one extra API request per 15 minutes per entry (the answer is cached). Each entry also polls
   the live board, and the limit is 60 requests/min per key, so a handful of entries is fine.
 - **Show route as "via" these stations**: optional, up to 5 comma-separated CRS codes, e.g. `GNW, LEW`.
-  Use it when the same destination is reached by different routes (for example London Cannon Street via
+  Use it when the same destination is reached by different routes (for example Abbey Wood via
   Greenwich *or* via Lewisham). Every train that calls at one of these stations gets it appended to its
-  destination: `London Cannon Street via Greenwich`. The rules are the same for every route:
+  destination: `Abbey Wood via Greenwich`. The rules are the same for every route:
   a train is labelled with each via station it stops at after your station, in route order
-  (`via Greenwich and Deptford`); a train that only runs through the station is not labelled; and a train
+  (`via Greenwich and Lewisham`); a train that only runs through the station is not labelled; and a train
   that *ends* at a via station is not labelled with it. Pick stations that every train on that route stops at.
   The label is in the `destination` attribute and in the *Next destination* sensor; the plain name is kept in
   `destination_name` and the list of stations in `via`. Each via station costs one cached API request per
@@ -81,11 +81,11 @@ It is excluded from the recorder database.
 
 ```yaml
 type: markdown
-title: Leeds departures
+title: Belvedere departures
 content: |
   | Time | Destination | Plat | Status |
   |---|---|---|---|
-  {% for d in state_attr('sensor.leeds_next_departure', 'departures') or [] -%}
+  {% for d in state_attr('sensor.belvedere_next_departure', 'departures') or [] -%}
   | {{ d.scheduled_time }} | {{ d.destination }} | {{ d.platform or '-' }} | {{ 'Exp ' ~ d.expected_time if d.status == 'delayed' else ('Cancelled' if d.status == 'cancelled' else 'On time') }} |
   {% endfor %}
 ```
@@ -97,8 +97,9 @@ Adjust the entity id to match yours (it follows the station's device name).
 This builds a board for one route with five columns: **Due** (scheduled time), **Destination**
 (with its "via" route), **Exp** (expected time), **Status** and **Left** (time until the expected time).
 Status is coloured: **red** when cancelled, **green** when on time, **amber** with the minutes when the
-train is running early or late. The card only appears when there is something to show. The example is a south-east London route where Cannon Street trains run
-either via Greenwich or via Lewisham; replace the stations with your own.
+train is running early or late. The card only appears when there is something to show. The example is a
+south-east London route, Belvedere (`BVD`) to Abbey Wood (`AWD`), where trains run either via Greenwich
+(`GNW`) or via Lewisham (`LEW`); replace the stations with your own.
 
 ### 1. Install flex-table-card
 
@@ -107,12 +108,12 @@ It is a separate dashboard card. In HACS open **Frontend**, search for **flex-ta
 
 ### 2. Set up the route and the "via" stations
 
-1. Add the integration with your station (example: `DFD`, Dartford) and **Only trains calling at** `CST`
-   (London Cannon Street). That lists only trains that stop at Cannon Street.
+1. Add the integration with your station (example: `BVD`, Belvedere) and **Only trains calling at** `AWD`
+   (Abbey Wood). That lists only trains that stop at Abbey Wood.
    (Leave it blank to list every train from your station.)
 2. Open the integration's **Configure** (cog) and set **Show route as 'via' these stations** to `GNW, LEW`
-   (Greenwich, Lewisham). Trains to Cannon Street now read *London Cannon Street via Greenwich* or
-   *London Cannon Street via Lewisham*. Any other pair of routes works the same way: add a station that
+   (Greenwich, Lewisham). Trains to Abbey Wood now read *Abbey Wood via Greenwich* or
+   *Abbey Wood via Lewisham*. Any other pair of routes works the same way: add a station that
    only one of the routes stops at.
 
 ### 3. Find your entity ids
@@ -122,9 +123,9 @@ They follow the device name; for the example they would be:
 
 | Entity | Used for |
 |---|---|
-| `sensor.dartford_to_london_cannon_street_next_departure` | holds the `departures` list the table is built from |
-| `sensor.dartford_to_london_cannon_street_next_status` | tells the card whether a train is running |
-| `sensor.dartford_to_london_cannon_street_cancelled_services` | tells the card whether any train is cancelled |
+| `sensor.belvedere_to_abbey_wood_next_departure` | holds the `departures` list the table is built from |
+| `sensor.belvedere_to_abbey_wood_next_status` | tells the card whether a train is running |
+| `sensor.belvedere_to_abbey_wood_cancelled_services` | tells the card whether any train is cancelled |
 
 If yours differ, replace them in the YAML below.
 
@@ -138,32 +139,32 @@ conditions:
   - condition: or
     conditions:
       - condition: state
-        entity: sensor.dartford_to_london_cannon_street_next_status
+        entity: sensor.belvedere_to_abbey_wood_next_status
         state_not:
           - unknown
           - unavailable
       - condition: numeric_state
-        entity: sensor.dartford_to_london_cannon_street_cancelled_services
+        entity: sensor.belvedere_to_abbey_wood_cancelled_services
         above: 0
 card:
   type: custom:flex-table-card
-  title: Dartford → London Cannon Street
+  title: 'Train: Belvedere → Abbey Wood'
   entities:
-    include: sensor.dartford_to_london_cannon_street_next_departure
+    include: sensor.belvedere_to_abbey_wood_next_departure
   css:
-    # Due and Exp: times never wrap
-    'tbody tr td:nth-child(1)': 'white-space: nowrap;'
-    'tbody tr td:nth-child(3)': 'white-space: nowrap;'
-    # Destination: smaller text, via on its own line
-    'tbody tr td:nth-child(2)': 'font-size: 0.85em; line-height: 1.2;'
-    # Status and Left: wide enough for "Cancelled", "-12 min" and "1h 56 min"
-    'tbody tr td:nth-child(4)': 'white-space: nowrap; min-width: 7em;'
-    'tbody tr td:nth-child(5)': 'white-space: nowrap; min-width: 7em;'
+    thead tr th:nth-child(1): 'text-align: center;'
+    thead tr th:nth-child(3): 'text-align: center;'
+    thead tr th:nth-child(4): 'text-align: center;'
+    thead tr th:nth-child(5): 'text-align: center;'
+    tbody tr td:nth-child(1): 'white-space: nowrap;'
+    tbody tr td:nth-child(3): 'white-space: nowrap;'
+    tbody tr td:nth-child(2): 'white-space: nowrap; text-align: center;'
+    tbody tr td:nth-child(4): 'white-space: nowrap; min-width: 5em; text-align: center;'
+    tbody tr td:nth-child(5): 'white-space: nowrap; min-width: 5em; text-align: right;'
   columns:
     - name: Due
       data: departures
-      modify: |-
-        x.scheduled_time
+      modify: x.scheduled_time
     - name: Destination
       data: departures
       modify: |-
@@ -175,8 +176,7 @@ card:
         })()
     - name: Exp
       data: departures
-      modify: |-
-        x.status == 'cancelled' ? '–' : x.expected_time
+      modify: 'x.status == ''cancelled'' ? ''–'' : x.expected_time'
     - name: Status
       data: departures
       modify: |-
@@ -204,9 +204,9 @@ How it works:
   has `data: departures`, and its `modify` expression gets the train as `x` and returns the cell's HTML.
 - **Due** is the timetabled time (`x.scheduled_time`).
 - **Destination** shows the destination name (`x.destination_name`) with the "via" route on a second line:
-  `London Cannon Street` then `via Greenwich`. The line break is `<br>`, so the via text always starts on a
-  new line. The route comes from the `via` list (several stations read `via Greenwich and Deptford`). Trains
-  without a via station show just the name. For the one-line form (`London Cannon Street via Greenwich`)
+  `Abbey Wood` then `via Greenwich`. The line break is `<br>`, so the via text always starts on a
+  new line. The route comes from the `via` list (several stations read `via Greenwich and Lewisham`). Trains
+  without a via station show just the name. For the one-line form (`Abbey Wood via Greenwich`)
   use `x.destination` instead.
 - **Exp** is the expected time exactly as the integration reports it (`x.expected_time`, from RailFeed's
   live data). Nothing is calculated from the delay. For a cancelled train it shows a dash.
@@ -222,11 +222,12 @@ How it works:
   the next train has a real status, or at least one service is cancelled. The second condition matters
   because when every listed train is cancelled there is no "next train", yet you still want to see them.
 - The table length follows **Departures to keep** and **Look-ahead window** in the integration's options.
-- **Column sizes** come from the `css:` block. Status and Left are set to `white-space: nowrap` with a
-  minimum width of `7em`, enough for the longest texts (`Cancelled`, `-12 min`, `1h 56 min`), so they never
-  break. Due and Exp are kept on one line too. Destination uses a smaller font (`0.85em`) and may wrap, so it
-  gives up space first; the via route is always on its own line. Change `0.85em` or `7em` if your screen needs different sizes. Each key is a CSS
-  selector for one column (`td:nth-child(2)` is the second).
+- **Column layout** comes from the `css:` block. Each key is a CSS selector for one column
+  (`td:nth-child(4)` is the fourth). All cells stay on one line (`white-space: nowrap`), so the times,
+  Status and Left never break, and the Destination's via line only breaks where the `<br>` is. Status and Left
+  have a minimum width of `5em`, enough for `Cancelled`, `-12 min` and `1h 56 min`. Destination and Status are
+  centred, Left is right-aligned, and the headers of Due, Exp, Status and Left are centred. Adjust the
+  values if your screen needs something different.
 - To change a colour, edit the `color:` value in the Status column (`red`, `green`, `#ffa000`).
 
 **Note on "Left":** it is worked out in your browser each time the card redraws. The card redraws when the
@@ -237,10 +238,10 @@ A board might look like this (Status colours are shown in brackets):
 
 | Due | Destination | Exp | Status | Left |
 |---|---|---|---|---|
-| 17:55 | London Cannon Street<br>via Greenwich | 18:03 | 8 min (amber) | 13 min |
-| 18:00 | London Cannon Street<br>via Lewisham | – | Cancelled (red) | – |
-| 18:10 | London Cannon Street<br>via Greenwich | 18:08 | -2 min (amber) | 18 min |
-| 18:25 | London Cannon Street<br>via Lewisham | 18:25 | On time (green) | 35 min |
+| 17:55 | Abbey Wood<br>via Greenwich | 18:03 | 8 min (amber) | 13 min |
+| 18:00 | Abbey Wood<br>via Lewisham | – | Cancelled (red) | – |
+| 18:10 | Abbey Wood<br>via Greenwich | 18:08 | -2 min (amber) | 18 min |
+| 18:25 | Abbey Wood<br>via Lewisham | 18:25 | On time (green) | 35 min |
 
 ### 5. Optional: a message when there are no trains
 
@@ -251,14 +252,14 @@ Add a second conditional card beneath the first. It appears only when there is n
 type: conditional
 conditions:
   - condition: state
-    entity: sensor.dartford_to_london_cannon_street_next_status
+    entity: sensor.belvedere_to_abbey_wood_next_status
     state: unknown
   - condition: numeric_state
-    entity: sensor.dartford_to_london_cannon_street_cancelled_services
+    entity: sensor.belvedere_to_abbey_wood_cancelled_services
     below: 1
 card:
   type: markdown
-  content: No trains to London Cannon Street in the look-ahead window.
+  content: No trains to Abbey Wood in the look-ahead window.
 ```
 
 With a list of `conditions`, *all* of them must hold; the first card needed `or` to show on *either*.
@@ -277,7 +278,7 @@ With a list of `conditions`, *all* of them must hold; the first card needed `or`
 ```yaml
 trigger:
   - platform: state
-    entity_id: sensor.leeds_next_status
+    entity_id: sensor.belvedere_next_status
     to: [delayed, cancelled]
 condition:
   - condition: time
@@ -287,9 +288,9 @@ action:
   - service: notify.notify
     data:
       message: >
-        {{ state_attr('sensor.leeds_next_departure','scheduled_time') }} to
-        {{ states('sensor.leeds_next_destination') }} is {{ states('sensor.leeds_next_status') }}
-        ({{ states('sensor.leeds_next_delay') }} min).
+        {{ state_attr('sensor.belvedere_next_departure','scheduled_time') }} to
+        {{ states('sensor.belvedere_next_destination') }} is {{ states('sensor.belvedere_next_status') }}
+        ({{ states('sensor.belvedere_next_delay') }} min).
 ```
 
 ## Notes
