@@ -6,7 +6,11 @@
         "description": "Create a free API key on your RailFeed account's API Keys page (railfeed.co.uk/api-keys), then enter the three-letter station code (CRS), e.g. LDS for Leeds or KGX for London King's Cross.",
         "data": {
           "api_key": "API key",
-          "station": "Station code (CRS)"
+          "station": "Station code (CRS)",
+          "calling_at": "Only trains calling at (optional)"
+        },
+        "data_description": {
+          "calling_at": "Three-letter CRS code of a station on the train's route, e.g. YRK. Only trains that stop there after this station are listed, whether or not it is their final destination. Add the same station again with a different code to track several destinations."
         }
       },
       "reauth_confirm": {
@@ -20,12 +24,13 @@
     "error": {
       "invalid_auth": "That API key was rejected.",
       "invalid_station": "RailFeed doesn't recognise that station code. Use the three-letter CRS code.",
+      "invalid_calling_at": "Enter a single three-letter CRS code that RailFeed knows, different from the station above.",
       "cannot_connect": "Couldn't reach RailFeed.",
       "rate_limited": "RailFeed rate limit reached. Try again in a minute.",
       "unknown": "Unexpected error talking to RailFeed."
     },
     "abort": {
-      "already_configured": "That station is already set up.",
+      "already_configured": "That station is already set up with that destination.",
       "reauth_successful": "API key updated."
     }
   },

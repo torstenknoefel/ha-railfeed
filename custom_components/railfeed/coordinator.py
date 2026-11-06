@@ -36,6 +36,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     MIN_SCAN_INTERVAL,
+    entry_key,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -61,6 +62,17 @@ def parse_crs_list(value: str | None) -> frozenset[str] | None:
     return frozenset(tokens)
 
 
+def entry_calling_at(entry: ConfigEntry) -> str | None:
+    """The 'calling at' station of a setup, or None.
+
+    Chosen when the setup is created (it is part of the setup's identity). Setups
+    made before that was possible kept it in their options, so fall back to those.
+    """
+    if CONF_CALLING_AT in entry.data:
+        return parse_crs(entry.data[CONF_CALLING_AT]) or None
+    return parse_crs(entry.options.get(CONF_CALLING_AT)) or None
+
+
 class RailFeedCoordinator(DataUpdateCoordinator[BoardData]):
     """Fetches and processes the live departure board."""
 
@@ -80,12 +92,14 @@ class RailFeedCoordinator(DataUpdateCoordinator[BoardData]):
             hass,
             _LOGGER,
             config_entry=entry,
-            name=f"{DOMAIN} {entry.data[CONF_STATION]}",
+            name=f"{DOMAIN} {entry.unique_id or entry.data[CONF_STATION]}",
             update_interval=timedelta(seconds=interval),
         )
         self.client = client
         self.tz = tz
         self.crs: str = entry.data[CONF_STATION]
+        self.calling_at: str | None = entry_calling_at(entry)
+        self.entry_key: str = entry.unique_id or entry_key(self.crs, self.calling_at)
         # schedule date -> (monotonic fetch time, {uid: CallingInfo})
         self._calling_cache: dict[date, tuple[float, dict[str, CallingInfo]]] = {}
 
@@ -100,7 +114,7 @@ class RailFeedCoordinator(DataUpdateCoordinator[BoardData]):
             raise UpdateFailed(f"Error fetching RailFeed data: {err}") from err
 
         now = dt_util.utcnow()
-        calling_at = parse_crs(opts.get(CONF_CALLING_AT)) or None
+        calling_at = self.calling_at
         calling = None
         if calling_at:
             calling = await self._async_get_calling(raw, now, hours, calling_at)

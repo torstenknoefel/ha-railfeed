@@ -11,6 +11,12 @@ board = importlib.util.module_from_spec(_spec)
 sys.modules["railfeed_board"] = board
 _spec.loader.exec_module(board)
 
+_cpath = _path.parent / "const.py"
+_cspec = importlib.util.spec_from_file_location("railfeed_const", _cpath)
+const = importlib.util.module_from_spec(_cspec)
+sys.modules["railfeed_const"] = const
+_cspec.loader.exec_module(const)
+
 TZ = ZoneInfo("Europe/London")
 NOW = datetime(2026, 11, 6, 17, 50, tzinfo=timezone.utc)  # 17:50 UK (GMT)
 
@@ -162,3 +168,12 @@ def test_service_dates_around_midnight():
     # just after midnight the board still holds yesterday's late trains
     early = datetime(2026, 11, 6, 0, 30, tzinfo=timezone.utc)
     assert board.service_dates(base, early, TZ, 2) == [date(2026, 11, 5), base]
+
+
+def test_entry_key_allows_same_station_with_different_destinations():
+    # Without a destination the key is the bare CRS, exactly as before, so setups
+    # created in earlier versions keep their entity and device ids.
+    assert const.entry_key("LDS") == const.entry_key("LDS", None) == const.entry_key("LDS", "") == "LDS"
+    keys = {const.entry_key("LDS"), const.entry_key("LDS", "YRK"), const.entry_key("LDS", "MAN")}
+    assert len(keys) == 3
+    assert const.entry_key("LDS", "YRK") != const.entry_key("YRK", "LDS")

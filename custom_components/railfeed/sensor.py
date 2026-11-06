@@ -119,10 +119,10 @@ class RailFeedSensor(CoordinatorEntity[RailFeedCoordinator], SensorEntity):
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
-        self._attr_unique_id = f"{coordinator.crs.lower()}_{description.key}"
+        self._attr_unique_id = f"{coordinator.entry_key.lower()}_{description.key}"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, coordinator.crs)},
-            name=coordinator.data.station,
+            identifiers={(DOMAIN, coordinator.entry_key)},
+            name=coordinator.config_entry.title or coordinator.data.station,
             manufacturer="RailFeed",
             model="Live departure board",
             entry_type=DeviceEntryType.SERVICE,

@@ -34,20 +34,36 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     MIN_SCAN_INTERVAL,
+    entry_key,
 )
 from .coordinator import parse_crs, parse_crs_list
 
 CRS_RE = re.compile(r"^[A-Za-z]{3}$")
 
 
-async def _validate(hass: HomeAssistant, api_key: str, crs: str) -> str:
-    """Check the key and station work; return the station's display name."""
+class InvalidCallingAtError(RailFeedError):
+    """RailFeed doesn't know the 'calling at' station."""
+
+
+async def _validate(
+    hass: HomeAssistant, api_key: str, crs: str, calling_at: str | None = None
+) -> str:
+    """Check the key and stations work; return a title for the setup."""
     client = RailFeedClient(async_get_clientsession(hass), api_key)
     board = await client.async_get_live_board(crs, hours=1)
-    return _tidy(board.get("station")) or crs
+    station = _tidy(board.get("station")) or crs
+    if not calling_at:
+        return station
+    try:
+        services = await client.async_get_services(crs, calling_at)
+    except RailFeedNotFoundError as err:
+        raise InvalidCallingAtError(str(err)) from err
+    return f"{station} to {_tidy(services.get('to')) or calling_at}"
 
 
 def _error_key(err: RailFeedError) -> str:
+    if isinstance(err, InvalidCallingAtError):
+        return "invalid_calling_at"
     if isinstance(err, RailFeedAuthError):
         return "invalid_auth"
     if isinstance(err, RailFeedNotFoundError):
@@ -71,24 +87,39 @@ class RailFeedConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             api_key = user_input[CONF_API_KEY].strip()
             crs = user_input[CONF_STATION].strip().upper()
+            calling_at = parse_crs(user_input.get(CONF_CALLING_AT))
 
             if not CRS_RE.match(crs):
                 errors[CONF_STATION] = "invalid_station"
+            elif calling_at is None or calling_at == crs:
+                errors[CONF_CALLING_AT] = "invalid_calling_at"
             else:
-                await self.async_set_unique_id(crs)
+                # One setup per station *and* destination, so the same station can
+                # be added again for a different 'calling at' station.
+                await self.async_set_unique_id(entry_key(crs, calling_at))
                 self._abort_if_unique_id_configured()
                 try:
-                    title = await _validate(self.hass, api_key, crs)
+                    title = await _validate(self.hass, api_key, crs, calling_at)
+                except InvalidCallingAtError:
+                    errors[CONF_CALLING_AT] = "invalid_calling_at"
                 except RailFeedError as err:
                     errors["base"] = _error_key(err)
                 else:
                     return self.async_create_entry(
                         title=title,
-                        data={CONF_API_KEY: api_key, CONF_STATION: crs},
+                        data={
+                            CONF_API_KEY: api_key,
+                            CONF_STATION: crs,
+                            CONF_CALLING_AT: calling_at,
+                        },
                     )
 
         schema = vol.Schema(
-            {vol.Required(CONF_API_KEY): str, vol.Required(CONF_STATION): str}
+            {
+                vol.Required(CONF_API_KEY): str,
+                vol.Required(CONF_STATION): str,
+                vol.Optional(CONF_CALLING_AT): str,
+            }
         )
         return self.async_show_form(
             step_id="user",
@@ -137,9 +168,12 @@ class RailFeedOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
+        # Setups made before the destination became part of a setup's identity keep
+        # their 'calling at' station in the options; newer ones fix it at creation.
+        legacy = CONF_CALLING_AT not in self.config_entry.data
         if user_input is not None:
             destinations = parse_crs_list(user_input.get(CONF_DESTINATIONS))
-            calling_at = parse_crs(user_input.get(CONF_CALLING_AT))
+            calling_at = parse_crs(user_input.get(CONF_CALLING_AT)) if legacy else ""
             station = self.config_entry.data[CONF_STATION]
             if destinations is None:
                 errors[CONF_DESTINATIONS] = "invalid_destinations"
@@ -149,13 +183,13 @@ class RailFeedOptionsFlow(OptionsFlow):
                 if calling_at:
                     errors.update(await self._check_calling_at(station, calling_at))
                 if not errors:
-                    return self.async_create_entry(
-                        data={
-                            **user_input,
-                            CONF_DESTINATIONS: ", ".join(sorted(destinations)),
-                            CONF_CALLING_AT: calling_at,
-                        }
-                    )
+                    data = {
+                        **user_input,
+                        CONF_DESTINATIONS: ", ".join(sorted(destinations)),
+                    }
+                    if legacy:
+                        data[CONF_CALLING_AT] = calling_at
+                    return self.async_create_entry(data=data)
 
         opts = self.config_entry.options
         schema = vol.Schema(
@@ -175,10 +209,18 @@ class RailFeedOptionsFlow(OptionsFlow):
                     CONF_PASSENGER_ONLY,
                     default=opts.get(CONF_PASSENGER_ONLY, DEFAULT_PASSENGER_ONLY),
                 ): bool,
-                vol.Optional(
-                    CONF_CALLING_AT,
-                    description={"suggested_value": opts.get(CONF_CALLING_AT, "")},
-                ): str,
+                **(
+                    {
+                        vol.Optional(
+                            CONF_CALLING_AT,
+                            description={
+                                "suggested_value": opts.get(CONF_CALLING_AT, "")
+                            },
+                        ): str
+                    }
+                    if legacy
+                    else {}
+                ),
                 vol.Optional(
                     CONF_DESTINATIONS,
                     description={"suggested_value": opts.get(CONF_DESTINATIONS, "")},

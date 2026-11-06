@@ -24,4 +24,15 @@ DEFAULT_PASSENGER_ONLY = True
 # /api/services lookup is cached (RailFeed itself caches schedules for 15 min).
 CALLING_CACHE_SECONDS = 900
 
+
+def entry_key(crs: str, calling_at: str | None = None) -> str:
+    """Identity of one setup: a station, optionally with a 'calling at' station.
+
+    A setup without a destination keeps the bare CRS code, which is what it
+    used before destinations were part of the identity, so existing entities
+    and devices are unaffected.
+    """
+    return f"{crs}_{calling_at}" if calling_at else crs
+
+
 ATTRIBUTION = "Data provided by RailFeed (railfeed.co.uk), built on Network Rail and Darwin feeds"

@@ -25,8 +25,12 @@ Copy `custom_components/railfeed` into your HA config folder's `custom_component
    <https://railfeed.co.uk/api-keys>.
 2. **Settings → Devices & services → Add integration → RailFeed**. Enter the key and the
    three-letter station (CRS) code, e.g. `LDS` (Leeds), `KGX` (King's Cross), `WIM` (Wimbledon).
+   Optionally add a **calling at** station (see below).
 
-Add the integration again for each extra station (one entry per station; the same key can be reused).
+Add the integration again for each extra station, or for the same station with a different
+**calling at** station (one entry per station + destination pair; the same key can be reused).
+For example `LDS` calling at `YRK` and `LDS` calling at `MAN` give two separate devices,
+"Leeds to York" and "Leeds to Manchester Piccadilly", each with its own sensors.
 
 ## Entities (per station)
 
@@ -47,9 +51,12 @@ It is excluded from the recorder database.
 - **Departures to keep** (default 10), **look-ahead window** (default 2 h).
 - **Passenger trains only** (default on): hides freight, empty stock and charters.
 - **Only trains calling at this station**: optional CRS code of any station on the train's route, e.g. `YRK`.
+  Chosen when you add the entry (it is what makes the entry unique); to change it, add a new entry and remove the old one.
+  (Entries created with v0.2.x keep it here in the options.)
   Only trains that stop there *after* your station are listed, whether or not it is their final destination.
   Each train also gets `calling_at_arrival` (advertised arrival time there) and `journey_minutes` attributes.
-  This costs one extra API request per 15 minutes (the answer is cached), well inside the rate limit.
+  This costs one extra API request per 15 minutes per entry (the answer is cached). Each entry also polls
+  the live board, and the limit is 60 requests/min per key, so a handful of entries is fine.
 - **Destination filter**: optional CRS codes of the train's *final* destination, e.g. `KGX, EDB`.
   Can be combined with the option above.
 
