@@ -33,7 +33,7 @@ Copy `custom_components/railfeed` into your HA config folder's `custom_component
 
 Add the integration again for each extra station, or for the same station with a different
 **calling at** station (one entry per station + destination pair; the same key can be reused).
-For example `BVD` calling at `AWD` and `BVD` calling at `GNW` give two separate devices,
+For example `BVD` calling at `ABW` and `BVD` calling at `GNW` give two separate devices,
 "Belvedere to Abbey Wood" and "Belvedere to Greenwich", each with its own sensors.
 
 ## Entities (per station)
@@ -54,7 +54,7 @@ It is excluded from the recorder database.
   limit is 60 requests/min per key).
 - **Departures to keep** (default 10), **look-ahead window** (default 2 h).
 - **Passenger trains only** (default on): hides freight, empty stock and charters.
-- **Only trains calling at this station**: optional CRS code of any station on the train's route, e.g. `AWD`.
+- **Only trains calling at this station**: optional CRS code of any station on the train's route, e.g. `ABW`.
   Chosen when you add the entry (it is what makes the entry unique); to change it, add a new entry and remove the old one.
   (Entries created with v0.2.x keep it here in the options.)
   Only trains that stop there *after* your station are listed, whether or not it is their final destination.
@@ -95,7 +95,7 @@ This builds a board for one route with five columns: **Due** (scheduled time), *
 (with its "via" route), **Exp** (expected time), **Status** and **Left** (time until the expected time).
 Status is coloured: **red** when cancelled, **green** when on time, **amber** with the minutes when the
 train is running early or late. The card only appears when there is something to show. The example is a
-south-east London route: trains from Belvedere (`BVD`) that call at Abbey Wood (`AWD`) and then run to London
+south-east London route: trains from Belvedere (`BVD`) that call at Abbey Wood (`ABW`) and then run to London
 Cannon Street either via Greenwich (`GNW`) or via Lewisham (`LEW`). Abbey Wood is only a *calling at* filter, not
 the destination, so every train that stops there is listed whatever its final destination is. Replace the
 stations with your own.
@@ -107,7 +107,7 @@ It is a separate dashboard card. In HACS open **Frontend**, search for **flex-ta
 
 ### 2. Set up the route and the "via" stations
 
-1. Add the integration with your station (example: `BVD`, Belvedere) and **Only trains calling at** `AWD`
+1. Add the integration with your station (example: `BVD`, Belvedere) and **Only trains calling at** `ABW`
    (Abbey Wood). That lists every train from Belvedere that stops at Abbey Wood, wherever it is going.
    (Leave it blank to list every train from your station.)
 2. Open the integration's **Configure** (cog) and set **Show route as 'via' these stations** to `GNW, LEW`
