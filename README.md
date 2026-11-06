@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="RailFeed – Home Assistant integration" width="480">
+</p>
+
 # RailFeed for Home Assistant
 
 [![hacs][hacs-badge]][hacs-url] [![Validate](https://github.com/torstenknoefel/ha-railfeed/actions/workflows/validate.yml/badge.svg)](https://github.com/torstenknoefel/ha-railfeed/actions/workflows/validate.yml) [![Tests](https://github.com/torstenknoefel/ha-railfeed/actions/workflows/tests.yml/badge.svg)](https://github.com/torstenknoefel/ha-railfeed/actions/workflows/tests.yml)
