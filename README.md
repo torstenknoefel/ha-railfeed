@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="assets/logo.png" alt="RailFeed – Home Assistant integration" width="480">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo_dark.png">
+    <img src="assets/logo.png" alt="RailFeed – Home Assistant integration" width="480">
+  </picture>
 </p>
 
 # RailFeed for Home Assistant
