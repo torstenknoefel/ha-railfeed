@@ -75,6 +75,120 @@ content: |
 
 Adjust the entity id to match yours (it follows the station's device name).
 
+## Tutorial: a departures board with a conditional card
+
+This builds a board for one route (the example uses **Leeds → York**) that lists each train's
+destination, scheduled time, estimated arrival, status and delay, shows **cancelled trains in red**,
+and only appears when there is something to show.
+
+### 1. Set up the route
+
+Add the integration with station `LDS` and **Only trains calling at** `YRK` (see [Set up](#set-up)).
+That gives the sensors a `calling_at_arrival` time for every train, which the *Est. arrival* column needs.
+Without a "calling at" station the board still works, but *Est. arrival* shows a dash.
+
+### 2. Find your entity ids
+
+Open **Settings → Devices & services → RailFeed**, pick the device (for example *Leeds to York*) and note
+the entity ids. They follow the device name, so this route gives:
+
+| Entity | Used for |
+|---|---|
+| `sensor.leeds_to_york_next_departure` | holds the `departures` list the table is built from |
+| `sensor.leeds_to_york_next_status` | tells the card whether a train is running |
+| `sensor.leeds_to_york_cancelled_services` | tells the card whether any train is cancelled |
+
+If yours differ (a different route or station name), replace them in the YAML below.
+
+### 3. Add the card
+
+On your dashboard choose **Edit → Add card → Manual**, and paste:
+
+```yaml
+type: conditional
+conditions:
+  - condition: or
+    conditions:
+      - condition: state
+        entity: sensor.leeds_to_york_next_status
+        state_not:
+          - unknown
+          - unavailable
+      - condition: numeric_state
+        entity: sensor.leeds_to_york_cancelled_services
+        above: 0
+card:
+  type: markdown
+  title: Leeds → York
+  content: |
+    {% macro red(text, bad) -%}
+    {%- if bad %}<font color="red">{{ text }}</font>{% else %}{{ text }}{% endif -%}
+    {%- endmacro %}
+    | Destination | Scheduled | Est. arrival | Status | Delay |
+    |---|---|---|---|---|
+    {%- for d in state_attr('sensor.leeds_to_york_next_departure', 'departures') or [] %}
+    {%- set bad = d.status == 'cancelled' %}
+    {%- set est = '–' %}
+    {%- if d.calling_at_arrival and not bad %}
+    {%- set h, m = d.calling_at_arrival.split(':') | map('int') | list %}
+    {%- set t = h * 60 + m + d.delay_minutes %}
+    {%- set est = '%02d:%02d' | format((t // 60) % 24, t % 60) %}
+    {%- endif %}
+    | {{ red(d.destination, bad) }} | {{ red(d.scheduled_time, bad) }} | {{ red(est, bad) }} | {{ red(d.status | replace('_', ' ') | capitalize, bad) }} | {{ red((d.delay_minutes ~ ' min') if d.delay_minutes else '–', bad) }} |
+    {%- endfor %}
+```
+
+How it works:
+
+- **The conditional card** (`type: conditional`) wraps the table and only shows it when *at least one* condition
+  holds (`condition: or`): the next train has a real status (`state_not: unknown / unavailable`), **or** at least
+  one service is cancelled (`cancelled_services` above 0). The second condition matters: when every listed train
+  is cancelled there is no "next train", yet you still want to see the cancellations.
+- **Red for cancelled trains:** the `red()` macro wraps each cell of a cancelled row in `<font color="red">`.
+  Change `red` to another colour name or a hex code such as `#d32f2f`.
+- **Est. arrival** is the train's advertised arrival at the "calling at" station plus its current delay
+  (`calling_at_arrival` + `delay_minutes`), wrapped past midnight. It is an estimate: trains often make up or
+  lose time along the way. It is a dash for cancelled trains.
+- **Delay** shows a dash when the train is on time.
+
+Cancelled rows look like this (shown here in plain text):
+
+| Destination | Scheduled | Est. arrival | Status | Delay |
+|---|---|---|---|---|
+| London Kings Cross | 17:55 | 19:29 | Delayed | 8 min |
+| **Edinburgh** (red) | **18:00** (red) | **–** (red) | **Cancelled** (red) | **–** (red) |
+| Newcastle | 23:58 | 00:40 | On time | – |
+
+### 4. Optional: a message when there are no trains
+
+Add this second conditional card beneath the first. It appears only when there is no running train
+**and** nothing cancelled, so the two cards never show together:
+
+```yaml
+type: conditional
+conditions:
+  - condition: state
+    entity: sensor.leeds_to_york_next_status
+    state: unknown
+  - condition: numeric_state
+    entity: sensor.leeds_to_york_cancelled_services
+    below: 1
+card:
+  type: markdown
+  content: No trains from Leeds to York in the look-ahead window.
+```
+
+With a list of `conditions`, *all* of them must hold; the first card needed `or` to show on *either*.
+
+### Tips
+
+- **While you edit the dashboard, conditional cards are always visible.** Leave edit mode to check that the
+  conditions behave.
+- Both cards can be reproduced in the UI: choose the **Conditional** card, or open any card's **Visibility** tab
+  and add the same conditions there.
+- One card per route: repeat the steps with the entity ids of your other entries.
+- The table length follows **Departures to keep** and **Look-ahead window** in the integration's options.
+
 ## Automation example: notify when your usual train is disrupted
 
 ```yaml
