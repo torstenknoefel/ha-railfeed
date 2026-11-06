@@ -87,9 +87,10 @@ Adjust the entity id to match yours (it follows the station's device name).
 
 ## Tutorial: a departures board with flex-table-card
 
-This builds a board for one route that lists each train's **destination (with its "via" route)**,
-scheduled time, estimated arrival, status and delay, shows **cancelled trains in red**, and only appears
-when there is something to show. The example is a south-east London route where Cannon Street trains run
+This builds a board for one route with five columns: **Due** (scheduled time), **Destination**
+(with its "via" route), **Exp** (expected time), **Status** and **Left** (time until the expected time).
+Status is coloured: **red** when cancelled, **green** when on time, **amber** with the minutes when the
+train is running early or late. The card only appears when there is something to show. The example is a south-east London route where Cannon Street trains run
 either via Greenwich or via Lewisham; replace the stations with your own.
 
 ### 1. Install flex-table-card
@@ -100,8 +101,8 @@ It is a separate dashboard card. In HACS open **Frontend**, search for **flex-ta
 ### 2. Set up the route and the "via" stations
 
 1. Add the integration with your station (example: `DFD`, Dartford) and **Only trains calling at** `CST`
-   (London Cannon Street). That gives every train a `calling_at_arrival` time, which the *Est. arrival*
-   column needs. Without it that column shows a dash.
+   (London Cannon Street). That lists only trains that stop at Cannon Street.
+   (Leave it blank to list every train from your station.)
 2. Open the integration's **Configure** (cog) and set **Show route as 'via' these stations** to `GNW, LEW`
    (Greenwich, Lewisham). Trains to Cannon Street now read *London Cannon Street via Greenwich* or
    *London Cannon Street via Lewisham*. Any other pair of routes works the same way: add a station that
@@ -143,58 +144,74 @@ card:
   entities:
     include: sensor.dartford_to_london_cannon_street_next_departure
   columns:
+    - name: Due
+      data: departures
+      modify: |-
+        x.scheduled_time
     - name: Destination
       data: departures
       modify: |-
-        (v => x.status == 'cancelled' ? '<span style="color:red">' + v + '</span>' : v)(x.destination)
-    - name: Scheduled
+        x.destination
+    - name: Exp
       data: departures
       modify: |-
-        (v => x.status == 'cancelled' ? '<span style="color:red">' + v + '</span>' : v)(x.scheduled_time)
-    - name: Est. arrival
-      data: departures
-      modify: |-
-        (v => x.status == 'cancelled' ? '<span style="color:red">' + v + '</span>' : v)(
-          x.status == 'cancelled' || !x.calling_at_arrival ? '–' : (() => {
-            const [h, m] = x.calling_at_arrival.split(':').map(Number);
-            const t = h * 60 + m + x.delay_minutes;
-            return String(Math.floor(t / 60) % 24).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
-          })())
+        x.status == 'cancelled' ? '–' : x.expected_time
     - name: Status
       data: departures
       modify: |-
-        (v => x.status == 'cancelled' ? '<span style="color:red">' + v + '</span>' : v)(
-          x.status == 'cancelled' ? 'Cancelled' : x.status == 'delayed' ? 'Delayed' : 'On time')
-    - name: Delay
+        (() => {
+          if (x.status == 'cancelled') return '<span style="color:red">Cancelled</span>';
+          const d = Math.round((new Date(x.expected) - new Date(x.scheduled)) / 60000);
+          return d
+            ? '<span style="color:#ffa000">' + d + ' min</span>'
+            : '<span style="color:green">On time</span>';
+        })()
+    - name: Left
       data: departures
       modify: |-
-        (v => x.status == 'cancelled' ? '<span style="color:red">' + v + '</span>' : v)(
-          x.status != 'cancelled' && x.delay_minutes ? x.delay_minutes + ' min' : '–')
+        (() => {
+          if (x.status == 'cancelled') return '–';
+          const m = Math.round((new Date(x.expected) - Date.now()) / 60000);
+          if (m <= 0) return 'now';
+          return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + ' min';
+        })()
 ```
 
 How it works:
 
 - **flex-table-card** reads the `departures` list from the sensor and builds one row per train. Each column
   has `data: departures`, and its `modify` expression gets the train as `x` and returns the cell's HTML.
-- **Destination** is `x.destination`, which already contains the "via" text. The plain name is `x.destination_name`
-  if you want it without the route.
-- **Red for cancelled trains:** every column wraps its value in `<span style="color:red">` when
-  `x.status == 'cancelled'`. Change the colour name or use a hex code such as `#d32f2f`.
-- **Est. arrival** is the advertised arrival at the "calling at" station plus the train's current delay
-  (`calling_at_arrival` + `delay_minutes`), wrapped past midnight. It is an estimate, as trains can make up
-  or lose time. It is a dash for cancelled trains.
+- **Due** is the timetabled time (`x.scheduled_time`).
+- **Destination** is `x.destination`, which already contains any "via" text. The plain name is
+  `x.destination_name` if you want it without the route.
+- **Exp** is the expected time exactly as the integration reports it (`x.expected_time`, from RailFeed's
+  live data). Nothing is calculated from the delay. For a cancelled train it shows a dash.
+- **Status** is coloured:
+  - *Cancelled* in **red**.
+  - *On time* in **green**.
+  - Any difference between expected and due time is shown as a number and `min`, in **amber**. A train
+    running late shows `8 min`; one running early keeps its minus sign, `-2 min`. The number is the expected
+    time minus the due time, so early trains are covered too.
+- **Left** is the time from now until the expected time: `13 min`, `1h 20m`, or `now` once it is due.
+  It is a dash for cancelled trains.
 - **The conditional card** wraps the table and shows it only when at least one condition holds (`or`):
   the next train has a real status, or at least one service is cancelled. The second condition matters
   because when every listed train is cancelled there is no "next train", yet you still want to see them.
 - The table length follows **Departures to keep** and **Look-ahead window** in the integration's options.
+- To change a colour, edit the `color:` value in the Status column (`red`, `green`, `#ffa000`).
 
-A board might look like this (cancelled row shown in red on the dashboard):
+**Note on "Left":** it is worked out in your browser each time the card redraws. The card redraws when the
+sensor's data changes, which is at most once per **Update interval** (default 60 s) and only if something
+about the departures changed, so the countdown can lag by a minute or more between updates.
 
-| Destination | Scheduled | Est. arrival | Status | Delay |
+A board might look like this (Status colours are shown in brackets):
+
+| Due | Destination | Exp | Status | Left |
 |---|---|---|---|---|
-| London Cannon Street via Greenwich | 17:55 | 19:29 | Delayed | 8 min |
-| London Cannon Street via Lewisham (red) | 18:00 (red) | – (red) | Cancelled (red) | – (red) |
-| London Cannon Street via Greenwich | 18:25 | 19:51 | On time | – |
+| 17:55 | London Cannon Street via Greenwich | 18:03 | 8 min (amber) | 13 min |
+| 18:00 | London Cannon Street via Lewisham | – | Cancelled (red) | – |
+| 18:10 | London Cannon Street via Greenwich | 18:08 | -2 min (amber) | 18 min |
+| 18:25 | London Cannon Street via Lewisham | 18:25 | On time (green) | 35 min |
 
 ### 5. Optional: a message when there are no trains
 
