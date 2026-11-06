@@ -177,3 +177,58 @@ def test_entry_key_allows_same_station_with_different_destinations():
     keys = {const.entry_key("LDS"), const.entry_key("LDS", "YRK"), const.entry_key("LDS", "MAN")}
     assert len(keys) == 3
     assert const.entry_key("LDS", "YRK") != const.entry_key("YRK", "LDS")
+
+
+# ---- via labels ---------------------------------------------------------------
+
+def _via(crs, name, calls):
+    """calls: {uid: journey_mins}"""
+    return board.ViaStation(
+        crs, name, {uid: board.CallingInfo("19:00", mins) for uid, mins in calls.items()}
+    )
+
+
+def test_via_label_added_to_destination():
+    gnw = _via("GNW", "Greenwich", {"A1": 20})
+    lew = _via("LEW", "Lewisham", {"A5": 25})
+    data = parse(via=[gnw, lew])
+    by_uid = {s.uid: s for s in data.services}
+    assert by_uid["A1"].destination_label == "London Kings Cross via Greenwich"
+    assert by_uid["A5"].destination_label == "London Kings Cross via Lewisham"
+    assert by_uid["A1"].as_dict()["destination"] == "London Kings Cross via Greenwich"
+    assert by_uid["A1"].as_dict()["destination_name"] == "London Kings Cross"
+    assert by_uid["A1"].as_dict()["via"] == ["Greenwich"]
+    # same destination, different route: the labels tell them apart
+    assert by_uid["A1"].destination == by_uid["A5"].destination
+
+
+def test_no_label_when_train_does_not_call_at_via_station():
+    data = parse(via=[_via("GNW", "Greenwich", {"A1": 20})])
+    s = {s.uid: s for s in data.services}
+    assert s["A2"].destination_label == "York" and s["A2"].via == ()
+    assert s["A2"].as_dict()["via"] == []
+
+
+def test_several_via_stations_listed_in_route_order():
+    # config order is Lewisham first, but Greenwich comes earlier on the route
+    lew = _via("LEW", "Lewisham", {"A1": 30})
+    gnw = _via("GNW", "Greenwich", {"A1": 20})
+    s = parse(via=[lew, gnw]).services[0]
+    assert s.via == ("Greenwich", "Lewisham")
+    assert s.destination_label == "London Kings Cross via Greenwich and Lewisham"
+    assert board.join_names(["A", "B", "C"]) == "A, B and C"
+
+
+def test_train_ending_at_via_station_is_not_labelled_via_it():
+    # A2 terminates at YRK; "York via York" would be nonsense
+    yrk = _via("YRK", "York", {"A2": 40, "A1": 40})
+    s = {s.uid: s for s in parse(via=[yrk]).services}
+    assert s["A2"].via == () and s["A2"].destination_label == "York"
+    assert s["A1"].via == ("York",)
+
+
+def test_via_combines_with_calling_filter_and_without_via_is_unchanged():
+    calling = board.parse_calling_services(SERVICES_RAW)
+    data = parse(calling=calling, via=[_via("GNW", "Greenwich", {"A5": 10})])
+    assert [(s.uid, s.via) for s in data.services] == [("A1", ()), ("A5", ("Greenwich",))]
+    assert [s.destination_label for s in parse().services][0] == "London Kings Cross"

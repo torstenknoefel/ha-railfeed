@@ -17,6 +17,8 @@ from .api import RailFeedAuthError, RailFeedClient, RailFeedError
 from .board import (
     BoardData,
     CallingInfo,
+    ViaStation,
+    _tidy,
     base_date_of,
     parse_board,
     parse_calling_services,
@@ -30,6 +32,7 @@ from .const import (
     CONF_MAX_DEPARTURES,
     CONF_PASSENGER_ONLY,
     CONF_STATION,
+    CONF_VIA,
     DEFAULT_HOURS,
     DEFAULT_MAX_DEPARTURES,
     DEFAULT_PASSENGER_ONLY,
@@ -100,8 +103,10 @@ class RailFeedCoordinator(DataUpdateCoordinator[BoardData]):
         self.crs: str = entry.data[CONF_STATION]
         self.calling_at: str | None = entry_calling_at(entry)
         self.entry_key: str = entry.unique_id or entry_key(self.crs, self.calling_at)
-        # schedule date -> (monotonic fetch time, {uid: CallingInfo})
-        self._calling_cache: dict[date, tuple[float, dict[str, CallingInfo]]] = {}
+        # (station, schedule date) -> (monotonic fetch time, {uid: CallingInfo}, name)
+        self._services_cache: dict[
+            tuple[str, date], tuple[float, dict[str, CallingInfo], str | None]
+        ] = {}
 
     async def _async_update_data(self) -> BoardData:
         opts = self.config_entry.options
@@ -117,7 +122,19 @@ class RailFeedCoordinator(DataUpdateCoordinator[BoardData]):
         calling_at = self.calling_at
         calling = None
         if calling_at:
-            calling = await self._async_get_calling(raw, now, hours, calling_at)
+            found = await self._async_get_services_to(raw, now, hours, calling_at)
+            calling = found[0] if found else {}
+
+        via_stations: list[ViaStation] = []
+        for via_crs in sorted(parse_crs_list(opts.get(CONF_VIA)) or ()):
+            if via_crs in (self.crs, calling_at):
+                continue
+            # Route labels are cosmetic: if the lookup fails, show the board without them.
+            found = await self._async_get_services_to(
+                raw, now, hours, via_crs, required=False
+            )
+            if found:
+                via_stations.append(ViaStation(via_crs, found[1] or via_crs, found[0]))
 
         return parse_board(
             raw,
@@ -128,34 +145,55 @@ class RailFeedCoordinator(DataUpdateCoordinator[BoardData]):
             destinations=parse_crs_list(opts.get(CONF_DESTINATIONS)) or frozenset(),
             calling=calling,
             calling_at=calling_at,
+            via=via_stations,
         )
 
-    async def _async_get_calling(
-        self, raw: dict, now: datetime, hours: int, calling_at: str
-    ) -> dict[str, CallingInfo]:
-        """Schedule uids of trains that call at ``calling_at`` after this station."""
+    async def _async_get_services_to(
+        self,
+        raw: dict,
+        now: datetime,
+        hours: int,
+        target: str,
+        *,
+        required: bool = True,
+    ) -> tuple[dict[str, CallingInfo], str | None] | None:
+        """Trains (by schedule uid) that call at ``target`` after this station.
+
+        Also returns the target's name. Answers are cached per schedule date, as the
+        timetable only changes slowly. When ``required`` is False a failed lookup
+        returns None instead of failing the whole update.
+        """
         needed = service_dates(base_date_of(raw, now, self.tz), now, self.tz, hours)
         mono = time.monotonic()
         merged: dict[str, CallingInfo] = {}
+        name: str | None = None
         for day in needed:
-            cached = self._calling_cache.get(day)
+            cached = self._services_cache.get((target, day))
             if cached is None or mono - cached[0] > CALLING_CACHE_SECONDS:
                 try:
                     services = await self.client.async_get_services(
-                        self.crs, calling_at, day.isoformat()
+                        self.crs, target, day.isoformat()
                     )
                 except RailFeedAuthError as err:
                     raise ConfigEntryAuthFailed(str(err)) from err
                 except RailFeedError as err:
                     if cached is None:
-                        raise UpdateFailed(
-                            f"Error fetching RailFeed services to {calling_at}: {err}"
-                        ) from err
-                    _LOGGER.warning("Using cached services to %s: %s", calling_at, err)
+                        if required:
+                            raise UpdateFailed(
+                                f"Error fetching RailFeed services to {target}: {err}"
+                            ) from err
+                        _LOGGER.warning("No services to %s: %s", target, err)
+                        return None
+                    _LOGGER.warning("Using cached services to %s: %s", target, err)
                 else:
-                    cached = (mono, parse_calling_services(services))
-                    self._calling_cache[day] = cached
+                    cached = (
+                        mono,
+                        parse_calling_services(services),
+                        _tidy(services.get("to")),
+                    )
+                    self._services_cache[(target, day)] = cached
             merged.update(cached[1])
-        for day in [d for d in self._calling_cache if d not in needed]:
-            del self._calling_cache[day]
-        return merged
+            name = cached[2] or name
+        for key in [k for k in self._services_cache if k[0] == target and k[1] not in needed]:
+            del self._services_cache[key]
+        return merged, name

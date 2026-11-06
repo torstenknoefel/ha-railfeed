@@ -57,6 +57,16 @@ It is excluded from the recorder database.
   Each train also gets `calling_at_arrival` (advertised arrival time there) and `journey_minutes` attributes.
   This costs one extra API request per 15 minutes per entry (the answer is cached). Each entry also polls
   the live board, and the limit is 60 requests/min per key, so a handful of entries is fine.
+- **Show route as "via" these stations**: optional, up to 5 comma-separated CRS codes, e.g. `GNW, LEW`.
+  Use it when the same destination is reached by different routes (for example London Cannon Street via
+  Greenwich *or* via Lewisham). Every train that calls at one of these stations gets it appended to its
+  destination: `London Cannon Street via Greenwich`. The rules are the same for every route:
+  a train is labelled with each via station it stops at after your station, in route order
+  (`via Greenwich and Deptford`); a train that only runs through the station is not labelled; and a train
+  that *ends* at a via station is not labelled with it. Pick stations that every train on that route stops at.
+  The label is in the `destination` attribute and in the *Next destination* sensor; the plain name is kept in
+  `destination_name` and the list of stations in `via`. Each via station costs one cached API request per
+  15 minutes per entry. If that lookup fails, the board still works, just without the label.
 - **Destination filter**: optional CRS codes of the train's *final* destination, e.g. `KGX, EDB`.
   Can be combined with the option above.
 
@@ -75,32 +85,42 @@ content: |
 
 Adjust the entity id to match yours (it follows the station's device name).
 
-## Tutorial: a departures board with a conditional card
+## Tutorial: a departures board with flex-table-card
 
-This builds a board for one route (the example uses **Leeds → York**) that lists each train's
-destination, scheduled time, estimated arrival, status and delay, shows **cancelled trains in red**,
-and only appears when there is something to show.
+This builds a board for one route that lists each train's **destination (with its "via" route)**,
+scheduled time, estimated arrival, status and delay, shows **cancelled trains in red**, and only appears
+when there is something to show. The example is a south-east London route where Cannon Street trains run
+either via Greenwich or via Lewisham; replace the stations with your own.
 
-### 1. Set up the route
+### 1. Install flex-table-card
 
-Add the integration with station `LDS` and **Only trains calling at** `YRK` (see [Set up](#set-up)).
-That gives the sensors a `calling_at_arrival` time for every train, which the *Est. arrival* column needs.
-Without a "calling at" station the board still works, but *Est. arrival* shows a dash.
+It is a separate dashboard card. In HACS open **Frontend**, search for **flex-table-card**
+(`custom-cards/flex-table-card`), download it and reload the browser.
 
-### 2. Find your entity ids
+### 2. Set up the route and the "via" stations
 
-Open **Settings → Devices & services → RailFeed**, pick the device (for example *Leeds to York*) and note
-the entity ids. They follow the device name, so this route gives:
+1. Add the integration with your station (example: `DFD`, Dartford) and **Only trains calling at** `CST`
+   (London Cannon Street). That gives every train a `calling_at_arrival` time, which the *Est. arrival*
+   column needs. Without it that column shows a dash.
+2. Open the integration's **Configure** (cog) and set **Show route as 'via' these stations** to `GNW, LEW`
+   (Greenwich, Lewisham). Trains to Cannon Street now read *London Cannon Street via Greenwich* or
+   *London Cannon Street via Lewisham*. Any other pair of routes works the same way: add a station that
+   only one of the routes stops at.
+
+### 3. Find your entity ids
+
+Open **Settings → Devices & services → RailFeed**, pick the device and note its entity ids.
+They follow the device name; for the example they would be:
 
 | Entity | Used for |
 |---|---|
-| `sensor.leeds_to_york_next_departure` | holds the `departures` list the table is built from |
-| `sensor.leeds_to_york_next_status` | tells the card whether a train is running |
-| `sensor.leeds_to_york_cancelled_services` | tells the card whether any train is cancelled |
+| `sensor.dartford_to_london_cannon_street_next_departure` | holds the `departures` list the table is built from |
+| `sensor.dartford_to_london_cannon_street_next_status` | tells the card whether a train is running |
+| `sensor.dartford_to_london_cannon_street_cancelled_services` | tells the card whether any train is cancelled |
 
-If yours differ (a different route or station name), replace them in the YAML below.
+If yours differ, replace them in the YAML below.
 
-### 3. Add the card
+### 4. Add the card
 
 On your dashboard choose **Edit → Add card → Manual**, and paste:
 
@@ -110,84 +130,101 @@ conditions:
   - condition: or
     conditions:
       - condition: state
-        entity: sensor.leeds_to_york_next_status
+        entity: sensor.dartford_to_london_cannon_street_next_status
         state_not:
           - unknown
           - unavailable
       - condition: numeric_state
-        entity: sensor.leeds_to_york_cancelled_services
+        entity: sensor.dartford_to_london_cannon_street_cancelled_services
         above: 0
 card:
-  type: markdown
-  title: Leeds → York
-  content: |
-    {% macro red(text, bad) -%}
-    {%- if bad %}<font color="red">{{ text }}</font>{% else %}{{ text }}{% endif -%}
-    {%- endmacro %}
-    | Destination | Scheduled | Est. arrival | Status | Delay |
-    |---|---|---|---|---|
-    {%- for d in state_attr('sensor.leeds_to_york_next_departure', 'departures') or [] %}
-    {%- set bad = d.status == 'cancelled' %}
-    {%- set est = '–' %}
-    {%- if d.calling_at_arrival and not bad %}
-    {%- set h, m = d.calling_at_arrival.split(':') | map('int') | list %}
-    {%- set t = h * 60 + m + d.delay_minutes %}
-    {%- set est = '%02d:%02d' | format((t // 60) % 24, t % 60) %}
-    {%- endif %}
-    | {{ red(d.destination, bad) }} | {{ red(d.scheduled_time, bad) }} | {{ red(est, bad) }} | {{ red(d.status | replace('_', ' ') | capitalize, bad) }} | {{ red((d.delay_minutes ~ ' min') if d.delay_minutes else '–', bad) }} |
-    {%- endfor %}
+  type: custom:flex-table-card
+  title: Dartford → London Cannon Street
+  entities:
+    include: sensor.dartford_to_london_cannon_street_next_departure
+  columns:
+    - name: Destination
+      data: departures
+      modify: |-
+        (v => x.status == 'cancelled' ? '<span style="color:red">' + v + '</span>' : v)(x.destination)
+    - name: Scheduled
+      data: departures
+      modify: |-
+        (v => x.status == 'cancelled' ? '<span style="color:red">' + v + '</span>' : v)(x.scheduled_time)
+    - name: Est. arrival
+      data: departures
+      modify: |-
+        (v => x.status == 'cancelled' ? '<span style="color:red">' + v + '</span>' : v)(
+          x.status == 'cancelled' || !x.calling_at_arrival ? '–' : (() => {
+            const [h, m] = x.calling_at_arrival.split(':').map(Number);
+            const t = h * 60 + m + x.delay_minutes;
+            return String(Math.floor(t / 60) % 24).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+          })())
+    - name: Status
+      data: departures
+      modify: |-
+        (v => x.status == 'cancelled' ? '<span style="color:red">' + v + '</span>' : v)(
+          x.status == 'cancelled' ? 'Cancelled' : x.status == 'delayed' ? 'Delayed' : 'On time')
+    - name: Delay
+      data: departures
+      modify: |-
+        (v => x.status == 'cancelled' ? '<span style="color:red">' + v + '</span>' : v)(
+          x.status != 'cancelled' && x.delay_minutes ? x.delay_minutes + ' min' : '–')
 ```
 
 How it works:
 
-- **The conditional card** (`type: conditional`) wraps the table and only shows it when *at least one* condition
-  holds (`condition: or`): the next train has a real status (`state_not: unknown / unavailable`), **or** at least
-  one service is cancelled (`cancelled_services` above 0). The second condition matters: when every listed train
-  is cancelled there is no "next train", yet you still want to see the cancellations.
-- **Red for cancelled trains:** the `red()` macro wraps each cell of a cancelled row in `<font color="red">`.
-  Change `red` to another colour name or a hex code such as `#d32f2f`.
-- **Est. arrival** is the train's advertised arrival at the "calling at" station plus its current delay
-  (`calling_at_arrival` + `delay_minutes`), wrapped past midnight. It is an estimate: trains often make up or
-  lose time along the way. It is a dash for cancelled trains.
-- **Delay** shows a dash when the train is on time.
+- **flex-table-card** reads the `departures` list from the sensor and builds one row per train. Each column
+  has `data: departures`, and its `modify` expression gets the train as `x` and returns the cell's HTML.
+- **Destination** is `x.destination`, which already contains the "via" text. The plain name is `x.destination_name`
+  if you want it without the route.
+- **Red for cancelled trains:** every column wraps its value in `<span style="color:red">` when
+  `x.status == 'cancelled'`. Change the colour name or use a hex code such as `#d32f2f`.
+- **Est. arrival** is the advertised arrival at the "calling at" station plus the train's current delay
+  (`calling_at_arrival` + `delay_minutes`), wrapped past midnight. It is an estimate, as trains can make up
+  or lose time. It is a dash for cancelled trains.
+- **The conditional card** wraps the table and shows it only when at least one condition holds (`or`):
+  the next train has a real status, or at least one service is cancelled. The second condition matters
+  because when every listed train is cancelled there is no "next train", yet you still want to see them.
+- The table length follows **Departures to keep** and **Look-ahead window** in the integration's options.
 
-Cancelled rows look like this (shown here in plain text):
+A board might look like this (cancelled row shown in red on the dashboard):
 
 | Destination | Scheduled | Est. arrival | Status | Delay |
 |---|---|---|---|---|
-| London Kings Cross | 17:55 | 19:29 | Delayed | 8 min |
-| **Edinburgh** (red) | **18:00** (red) | **–** (red) | **Cancelled** (red) | **–** (red) |
-| Newcastle | 23:58 | 00:40 | On time | – |
+| London Cannon Street via Greenwich | 17:55 | 19:29 | Delayed | 8 min |
+| London Cannon Street via Lewisham (red) | 18:00 (red) | – (red) | Cancelled (red) | – (red) |
+| London Cannon Street via Greenwich | 18:25 | 19:51 | On time | – |
 
-### 4. Optional: a message when there are no trains
+### 5. Optional: a message when there are no trains
 
-Add this second conditional card beneath the first. It appears only when there is no running train
+Add a second conditional card beneath the first. It appears only when there is no running train
 **and** nothing cancelled, so the two cards never show together:
 
 ```yaml
 type: conditional
 conditions:
   - condition: state
-    entity: sensor.leeds_to_york_next_status
+    entity: sensor.dartford_to_london_cannon_street_next_status
     state: unknown
   - condition: numeric_state
-    entity: sensor.leeds_to_york_cancelled_services
+    entity: sensor.dartford_to_london_cannon_street_cancelled_services
     below: 1
 card:
   type: markdown
-  content: No trains from Leeds to York in the look-ahead window.
+  content: No trains to London Cannon Street in the look-ahead window.
 ```
 
 With a list of `conditions`, *all* of them must hold; the first card needed `or` to show on *either*.
 
 ### Tips
 
-- **While you edit the dashboard, conditional cards are always visible.** Leave edit mode to check that the
-  conditions behave.
-- Both cards can be reproduced in the UI: choose the **Conditional** card, or open any card's **Visibility** tab
-  and add the same conditions there.
+- **While you edit the dashboard, conditional cards are always visible.** Leave edit mode to check the
+  conditions.
 - One card per route: repeat the steps with the entity ids of your other entries.
-- The table length follows **Departures to keep** and **Look-ahead window** in the integration's options.
+- If a cell shows raw `<span …>` text instead of red, your flex-table-card version may be escaping HTML;
+  update it from HACS.
+- Prefer no extra card? A built-in markdown card can show the same table; see the *Dashboard card* section.
 
 ## Automation example: notify when your usual train is disrupted
 
@@ -215,6 +252,7 @@ action:
 - "Calling at" uses the *scheduled* timetable (RailFeed's `/api/services`), so a train added at very short
   notice may not appear until that timetable lookup refreshes, and a train that skips the station today
   because of disruption still shows.
+- "Via" labels use the same scheduled-timetable lookup as "calling at", so they share its limits.
 - Platforms the operator has asked to keep off public screens are hidden.
 - Data is attributed to RailFeed; not affiliated with National Rail.
 

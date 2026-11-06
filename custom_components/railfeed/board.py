@@ -4,7 +4,7 @@ Deliberately has no Home Assistant imports so it can be unit tested on its own.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, tzinfo
 import string
@@ -50,6 +50,22 @@ class CallingInfo:
 
     arrival: str | None  # advertised arrival, "HH:MM"
     journey_mins: int | None
+
+
+@dataclass(frozen=True)
+class ViaStation:
+    """A station used to tell routes apart ("via Greenwich") and the trains calling there."""
+
+    crs: str
+    name: str
+    calling: Mapping[str, CallingInfo]
+
+
+def join_names(names: Sequence[str]) -> str:
+    """'A', 'A and B', 'A, B and C'."""
+    if len(names) <= 1:
+        return "".join(names)
+    return ", ".join(names[:-1]) + " and " + names[-1]
 
 
 def parse_calling_services(raw: dict[str, Any]) -> dict[str, CallingInfo]:
@@ -121,6 +137,14 @@ class Service:
     coaches: int | None
     calling_at_arrival: str | None = None
     journey_minutes: int | None = None
+    via: tuple[str, ...] = ()
+
+    @property
+    def destination_label(self) -> str | None:
+        """Destination, with the route appended when known: 'London Cannon Street via Greenwich'."""
+        if self.destination and self.via:
+            return f"{self.destination} via {join_names(self.via)}"
+        return self.destination
 
     @property
     def cancelled(self) -> bool:
@@ -128,7 +152,9 @@ class Service:
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "destination": self.destination,
+            "destination": self.destination_label,
+            "destination_name": self.destination,
+            "via": list(self.via),
             "destination_crs": self.destination_crs,
             "origin": self.origin,
             "operator": self.operator,
@@ -182,6 +208,7 @@ def _parse_service(
     passenger_only: bool,
     destinations: frozenset[str],
     calling: Mapping[str, CallingInfo] | None = None,
+    via: Sequence[ViaStation] = (),
 ) -> Service | None:
     # Things that never belong on a departure board.
     if item.get("is_pass") or item.get("stale") or item.get("reached_destination"):
@@ -207,6 +234,17 @@ def _parse_service(
         calling_info = calling.get(item.get("uid"))
         if calling_info is None:  # train doesn't call at the configured station
             return None
+
+    # Route labels: every configured via station this train calls at (after the
+    # board's station), in route order. A train that ends at a via station is not
+    # "via" it, and a train that merely runs through one is not labelled.
+    hits = [
+        (v.calling[item.get("uid")].journey_mins, v.name)
+        for v in via
+        if v.crs != destination_crs and item.get("uid") in v.calling
+    ]
+    hits.sort(key=lambda h: (h[0] is None, h[0] or 0))
+    via_names = tuple(name for _, name in hits)
 
     sched_t = _parse_time(item.get("public_departure")) or _parse_time(
         item.get("scheduled_departure")
@@ -282,6 +320,7 @@ def _parse_service(
         coaches=coaches,
         calling_at_arrival=calling_info.arrival if calling_info else None,
         journey_minutes=calling_info.journey_mins if calling_info else None,
+        via=via_names,
     )
 
 
@@ -295,6 +334,7 @@ def parse_board(
     destinations: frozenset[str],
     calling: Mapping[str, CallingInfo] | None = None,
     calling_at: str | None = None,
+    via: Sequence[ViaStation] = (),
 ) -> BoardData:
     """Turn a raw live_board response into a BoardData.
 
@@ -313,6 +353,7 @@ def parse_board(
             passenger_only=passenger_only,
             destinations=destinations,
             calling=calling,
+            via=via,
         )
         if service is None:
             continue

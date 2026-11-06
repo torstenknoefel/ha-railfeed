@@ -59,7 +59,7 @@ SENSORS: tuple[RailFeedSensorDescription, ...] = (
     RailFeedSensorDescription(
         key="next_destination",
         translation_key="next_destination",
-        value_fn=lambda b: _next_attr(b, lambda s: s.destination),
+        value_fn=lambda b: _next_attr(b, lambda s: s.destination_label),
     ),
     RailFeedSensorDescription(
         key="next_platform",

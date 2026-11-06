@@ -28,15 +28,17 @@ from .const import (
     CONF_MAX_DEPARTURES,
     CONF_PASSENGER_ONLY,
     CONF_STATION,
+    CONF_VIA,
     DEFAULT_HOURS,
     DEFAULT_MAX_DEPARTURES,
     DEFAULT_PASSENGER_ONLY,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    MAX_VIA,
     MIN_SCAN_INTERVAL,
     entry_key,
 )
-from .coordinator import parse_crs, parse_crs_list
+from .coordinator import entry_calling_at, parse_crs, parse_crs_list
 
 CRS_RE = re.compile(r"^[A-Za-z]{3}$")
 
@@ -162,7 +164,7 @@ class RailFeedConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class RailFeedOptionsFlow(OptionsFlow):
-    """Options: polling interval, board size, filters."""
+    """Options: polling interval, board size, filters, route labels."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -171,21 +173,45 @@ class RailFeedOptionsFlow(OptionsFlow):
         # Setups made before the destination became part of a setup's identity keep
         # their 'calling at' station in the options; newer ones fix it at creation.
         legacy = CONF_CALLING_AT not in self.config_entry.data
+        station = self.config_entry.data[CONF_STATION]
         if user_input is not None:
             destinations = parse_crs_list(user_input.get(CONF_DESTINATIONS))
-            calling_at = parse_crs(user_input.get(CONF_CALLING_AT)) if legacy else ""
-            station = self.config_entry.data[CONF_STATION]
+            via = parse_crs_list(user_input.get(CONF_VIA))
+            if legacy:
+                calling_at = parse_crs(user_input.get(CONF_CALLING_AT))
+            else:
+                calling_at = entry_calling_at(self.config_entry) or ""
             if destinations is None:
                 errors[CONF_DESTINATIONS] = "invalid_destinations"
             elif calling_at is None or calling_at == station:
                 errors[CONF_CALLING_AT] = "invalid_calling_at"
+            elif (
+                via is None
+                or len(via) > MAX_VIA
+                or station in via
+                or (calling_at and calling_at in via)
+            ):
+                errors[CONF_VIA] = "invalid_via"
             else:
-                if calling_at:
-                    errors.update(await self._check_calling_at(station, calling_at))
+                if legacy and calling_at:
+                    errors.update(
+                        await self._check_station(
+                            station, calling_at, CONF_CALLING_AT, "invalid_calling_at"
+                        )
+                    )
+                for via_crs in sorted(via):
+                    if errors:
+                        break
+                    errors.update(
+                        await self._check_station(
+                            station, via_crs, CONF_VIA, "invalid_via"
+                        )
+                    )
                 if not errors:
                     data = {
                         **user_input,
                         CONF_DESTINATIONS: ", ".join(sorted(destinations)),
+                        CONF_VIA: ", ".join(sorted(via)),
                     }
                     if legacy:
                         data[CONF_CALLING_AT] = calling_at
@@ -222,6 +248,10 @@ class RailFeedOptionsFlow(OptionsFlow):
                     else {}
                 ),
                 vol.Optional(
+                    CONF_VIA,
+                    description={"suggested_value": opts.get(CONF_VIA, "")},
+                ): str,
+                vol.Optional(
                     CONF_DESTINATIONS,
                     description={"suggested_value": opts.get(CONF_DESTINATIONS, "")},
                 ): str,
@@ -229,15 +259,17 @@ class RailFeedOptionsFlow(OptionsFlow):
         )
         return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
 
-    async def _check_calling_at(self, station: str, calling_at: str) -> dict[str, str]:
-        """Make sure RailFeed knows the station; return form errors, if any."""
+    async def _check_station(
+        self, station: str, target: str, field: str, error_key: str
+    ) -> dict[str, str]:
+        """Make sure RailFeed knows ``target``; return form errors, if any."""
         client = RailFeedClient(
             async_get_clientsession(self.hass), self.config_entry.data[CONF_API_KEY]
         )
         try:
-            await client.async_get_services(station, calling_at)
+            await client.async_get_services(station, target)
         except RailFeedNotFoundError:
-            return {CONF_CALLING_AT: "invalid_calling_at"}
+            return {field: error_key}
         except RailFeedError as err:
             return {"base": _error_key(err)}
         return {}

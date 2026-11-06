@@ -12,6 +12,10 @@ CONF_HOURS = "hours"
 CONF_DESTINATIONS = "destinations"
 CONF_PASSENGER_ONLY = "passenger_only"
 CONF_CALLING_AT = "calling_at"
+CONF_VIA = "via"
+
+# Each via station costs one cached /api/services lookup per schedule day.
+MAX_VIA = 5
 
 # RailFeed asks clients to poll a live board no more than every 30 seconds.
 MIN_SCAN_INTERVAL = 30
