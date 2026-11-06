@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo_dark.png">
-    <img src="assets/logo.png" alt="RailFeed – Home Assistant integration" width="480">
-  </picture>
+  <img src="assets/logo.png" alt="RailFeed – Home Assistant integration" width="480">
 </p>
 
 # RailFeed for Home Assistant
@@ -65,9 +62,9 @@ It is excluded from the recorder database.
   This costs one extra API request per 15 minutes per entry (the answer is cached). Each entry also polls
   the live board, and the limit is 60 requests/min per key, so a handful of entries is fine.
 - **Show route as "via" these stations**: optional, up to 5 comma-separated CRS codes, e.g. `GNW, LEW`.
-  Use it when the same destination is reached by different routes (for example Abbey Wood via
+  Use it when the same destination is reached by different routes (for example London Cannon Street via
   Greenwich *or* via Lewisham). Every train that calls at one of these stations gets it appended to its
-  destination: `Abbey Wood via Greenwich`. The rules are the same for every route:
+  destination: `London Cannon Street via Greenwich`. The rules are the same for every route:
   a train is labelled with each via station it stops at after your station, in route order
   (`via Greenwich and Lewisham`); a train that only runs through the station is not labelled; and a train
   that *ends* at a via station is not labelled with it. Pick stations that every train on that route stops at.
@@ -98,8 +95,10 @@ This builds a board for one route with five columns: **Due** (scheduled time), *
 (with its "via" route), **Exp** (expected time), **Status** and **Left** (time until the expected time).
 Status is coloured: **red** when cancelled, **green** when on time, **amber** with the minutes when the
 train is running early or late. The card only appears when there is something to show. The example is a
-south-east London route, Belvedere (`BVD`) to Abbey Wood (`AWD`), where trains run either via Greenwich
-(`GNW`) or via Lewisham (`LEW`); replace the stations with your own.
+south-east London route: trains from Belvedere (`BVD`) that call at Abbey Wood (`AWD`) and then run to London
+Cannon Street either via Greenwich (`GNW`) or via Lewisham (`LEW`). Abbey Wood is only a *calling at* filter, not
+the destination, so every train that stops there is listed whatever its final destination is. Replace the
+stations with your own.
 
 ### 1. Install flex-table-card
 
@@ -109,11 +108,11 @@ It is a separate dashboard card. In HACS open **Frontend**, search for **flex-ta
 ### 2. Set up the route and the "via" stations
 
 1. Add the integration with your station (example: `BVD`, Belvedere) and **Only trains calling at** `AWD`
-   (Abbey Wood). That lists only trains that stop at Abbey Wood.
+   (Abbey Wood). That lists every train from Belvedere that stops at Abbey Wood, wherever it is going.
    (Leave it blank to list every train from your station.)
 2. Open the integration's **Configure** (cog) and set **Show route as 'via' these stations** to `GNW, LEW`
-   (Greenwich, Lewisham). Trains to Abbey Wood now read *Abbey Wood via Greenwich* or
-   *Abbey Wood via Lewisham*. Any other pair of routes works the same way: add a station that
+   (Greenwich, Lewisham). Those trains, which end at London Cannon Street, now read *London Cannon Street via Greenwich* or
+   *London Cannon Street via Lewisham*. Any other pair of routes works the same way: add a station that
    only one of the routes stops at.
 
 ### 3. Find your entity ids
@@ -204,9 +203,9 @@ How it works:
   has `data: departures`, and its `modify` expression gets the train as `x` and returns the cell's HTML.
 - **Due** is the timetabled time (`x.scheduled_time`).
 - **Destination** shows the destination name (`x.destination_name`) with the "via" route on a second line:
-  `Abbey Wood` then `via Greenwich`. The line break is `<br>`, so the via text always starts on a
+  `London Cannon Street` then `via Greenwich`. The line break is `<br>`, so the via text always starts on a
   new line. The route comes from the `via` list (several stations read `via Greenwich and Lewisham`). Trains
-  without a via station show just the name. For the one-line form (`Abbey Wood via Greenwich`)
+  without a via station show just the name. For the one-line form (`London Cannon Street via Greenwich`)
   use `x.destination` instead.
 - **Exp** is the expected time exactly as the integration reports it (`x.expected_time`, from RailFeed's
   live data). Nothing is calculated from the delay. For a cancelled train it shows a dash.
@@ -238,10 +237,10 @@ A board might look like this (Status colours are shown in brackets):
 
 | Due | Destination | Exp | Status | Left |
 |---|---|---|---|---|
-| 17:55 | Abbey Wood<br>via Greenwich | 18:03 | 8 min (amber) | 13 min |
-| 18:00 | Abbey Wood<br>via Lewisham | – | Cancelled (red) | – |
-| 18:10 | Abbey Wood<br>via Greenwich | 18:08 | -2 min (amber) | 18 min |
-| 18:25 | Abbey Wood<br>via Lewisham | 18:25 | On time (green) | 35 min |
+| 17:55 | London Cannon Street<br>via Greenwich | 18:03 | 8 min (amber) | 13 min |
+| 18:00 | London Cannon Street<br>via Lewisham | – | Cancelled (red) | – |
+| 18:10 | London Cannon Street<br>via Greenwich | 18:08 | -2 min (amber) | 18 min |
+| 18:25 | London Cannon Street<br>via Lewisham | 18:25 | On time (green) | 35 min |
 
 ### 5. Optional: a message when there are no trains
 
@@ -259,6 +258,7 @@ conditions:
     below: 1
 card:
   type: markdown
+  title: 'Train: Belvedere → Abbey Wood'
   content: No trains to Abbey Wood in the look-ahead window.
 ```
 
