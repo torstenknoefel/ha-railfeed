@@ -154,7 +154,7 @@ card:
     # Due and Exp: times never wrap
     'tbody tr td:nth-child(1)': 'white-space: nowrap;'
     'tbody tr td:nth-child(3)': 'white-space: nowrap;'
-    # Destination: smaller text, free to wrap onto a second line
+    # Destination: smaller text, via on its own line
     'tbody tr td:nth-child(2)': 'font-size: 0.85em; line-height: 1.2;'
     # Status and Left: wide enough for "Cancelled", "-12 min" and "1h 56 min"
     'tbody tr td:nth-child(4)': 'white-space: nowrap; min-width: 7em;'
@@ -167,7 +167,12 @@ card:
     - name: Destination
       data: departures
       modify: |-
-        x.destination
+        (() => {
+          const v = x.via || [];
+          if (!v.length) return x.destination_name;
+          const names = v.length > 1 ? v.slice(0, -1).join(', ') + ' and ' + v[v.length - 1] : v[0];
+          return x.destination_name + '<br>via ' + names;
+        })()
     - name: Exp
       data: departures
       modify: |-
@@ -198,8 +203,11 @@ How it works:
 - **flex-table-card** reads the `departures` list from the sensor and builds one row per train. Each column
   has `data: departures`, and its `modify` expression gets the train as `x` and returns the cell's HTML.
 - **Due** is the timetabled time (`x.scheduled_time`).
-- **Destination** is `x.destination`, which already contains any "via" text. The plain name is
-  `x.destination_name` if you want it without the route.
+- **Destination** shows the destination name (`x.destination_name`) with the "via" route on a second line:
+  `London Cannon Street` then `via Greenwich`. The line break is `<br>`, so the via text always starts on a
+  new line. The route comes from the `via` list (several stations read `via Greenwich and Deptford`). Trains
+  without a via station show just the name. For the one-line form (`London Cannon Street via Greenwich`)
+  use `x.destination` instead.
 - **Exp** is the expected time exactly as the integration reports it (`x.expected_time`, from RailFeed's
   live data). Nothing is calculated from the delay. For a cancelled train it shows a dash.
 - **Status** is coloured:
@@ -217,7 +225,7 @@ How it works:
 - **Column sizes** come from the `css:` block. Status and Left are set to `white-space: nowrap` with a
   minimum width of `7em`, enough for the longest texts (`Cancelled`, `-12 min`, `1h 56 min`), so they never
   break. Due and Exp are kept on one line too. Destination uses a smaller font (`0.85em`) and may wrap, so it
-  gives up space first. Change `0.85em` or `7em` if your screen needs different sizes. Each key is a CSS
+  gives up space first; the via route is always on its own line. Change `0.85em` or `7em` if your screen needs different sizes. Each key is a CSS
   selector for one column (`td:nth-child(2)` is the second).
 - To change a colour, edit the `color:` value in the Status column (`red`, `green`, `#ffa000`).
 
@@ -229,10 +237,10 @@ A board might look like this (Status colours are shown in brackets):
 
 | Due | Destination | Exp | Status | Left |
 |---|---|---|---|---|
-| 17:55 | London Cannon Street via Greenwich | 18:03 | 8 min (amber) | 13 min |
-| 18:00 | London Cannon Street via Lewisham | – | Cancelled (red) | – |
-| 18:10 | London Cannon Street via Greenwich | 18:08 | -2 min (amber) | 18 min |
-| 18:25 | London Cannon Street via Lewisham | 18:25 | On time (green) | 35 min |
+| 17:55 | London Cannon Street<br>via Greenwich | 18:03 | 8 min (amber) | 13 min |
+| 18:00 | London Cannon Street<br>via Lewisham | – | Cancelled (red) | – |
+| 18:10 | London Cannon Street<br>via Greenwich | 18:08 | -2 min (amber) | 18 min |
+| 18:25 | London Cannon Street<br>via Lewisham | 18:25 | On time (green) | 35 min |
 
 ### 5. Optional: a message when there are no trains
 
