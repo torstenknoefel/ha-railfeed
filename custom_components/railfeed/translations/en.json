@@ -3,14 +3,14 @@
     "step": {
       "user": {
         "title": "Connect to RailFeed",
-        "description": "Create a free API key on your RailFeed account's API Keys page (railfeed.co.uk/api-keys), then enter the three-letter station code (CRS), e.g. LDS for Leeds or KGX for London King's Cross.",
+        "description": "Create a free API key on your RailFeed account's API Keys page (railfeed.co.uk/api-keys), then enter the three-letter station code (CRS), e.g. BVD for Belvedere or KGX for London King's Cross.",
         "data": {
           "api_key": "API key",
           "station": "Station code (CRS)",
           "calling_at": "Only trains calling at (optional)"
         },
         "data_description": {
-          "calling_at": "Three-letter CRS code of a station on the train's route, e.g. YRK. Only trains that stop there after this station are listed, whether or not it is their final destination. Add the same station again with a different code to track several destinations."
+          "calling_at": "Three-letter CRS code of a station on the train's route, e.g. ABW. Only trains that stop there after this station are listed, whether or not it is their final destination. Add the same station again with a different code to track several destinations."
         }
       },
       "reauth_confirm": {
@@ -51,8 +51,8 @@
           "scan_interval": "Minimum 30. RailFeed's feeds don't update faster than that.",
           "max_departures": "How many upcoming departures to include in the 'departures' attribute.",
           "passenger_only": "Hides freight, empty stock and charters.",
-          "calling_at": "Optional. Three-letter CRS code of a station on the train's route, e.g. YRK. Only trains that stop there after this station are listed, whether or not it is their final destination. Leave blank for all.",
-          "via": "Optional. Comma-separated CRS codes of stations that tell routes apart, e.g. GNW, LEW (up to 5). Trains calling at one of them get 'via <station>' added to their destination. Leave blank for none.",
+          "calling_at": "Optional. Three-letter CRS code of a station on the train's route, e.g. ABW. Only trains that stop there after this station are listed, whether or not it is their final destination. Leave blank for all.",
+          "via": "Optional. Comma-separated CRS codes of stations that tell routes apart, e.g. GNW, LEW (up to 5). Trains calling at one of them get the word 'via' and the station name added to their destination, e.g. London Cannon Street via Greenwich. Leave blank for none.",
           "destinations": "Optional. Comma-separated CRS codes of the train's final destination, e.g. KGX, EDB. Leave blank for all."
         }
       }
