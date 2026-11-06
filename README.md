@@ -150,6 +150,15 @@ card:
   title: Dartford → London Cannon Street
   entities:
     include: sensor.dartford_to_london_cannon_street_next_departure
+  css:
+    # Due and Exp: times never wrap
+    'tbody tr td:nth-child(1)': 'white-space: nowrap;'
+    'tbody tr td:nth-child(3)': 'white-space: nowrap;'
+    # Destination: smaller text, free to wrap onto a second line
+    'tbody tr td:nth-child(2)': 'font-size: 0.85em; line-height: 1.2;'
+    # Status and Left: wide enough for "Cancelled", "-12 min" and "1h 56 min"
+    'tbody tr td:nth-child(4)': 'white-space: nowrap; min-width: 7em;'
+    'tbody tr td:nth-child(5)': 'white-space: nowrap; min-width: 7em;'
   columns:
     - name: Due
       data: departures
@@ -180,7 +189,7 @@ card:
           if (x.status == 'cancelled') return '–';
           const m = Math.round((new Date(x.expected) - Date.now()) / 60000);
           if (m <= 0) return 'now';
-          return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + ' min';
+          return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + ' min' : m + ' min';
         })()
 ```
 
@@ -199,12 +208,17 @@ How it works:
   - Any difference between expected and due time is shown as a number and `min`, in **amber**. A train
     running late shows `8 min`; one running early keeps its minus sign, `-2 min`. The number is the expected
     time minus the due time, so early trains are covered too.
-- **Left** is the time from now until the expected time: `13 min`, `1h 20m`, or `now` once it is due.
+- **Left** is the time from now until the expected time: `13 min`, `1h 20 min`, or `now` once it is due.
   It is a dash for cancelled trains.
 - **The conditional card** wraps the table and shows it only when at least one condition holds (`or`):
   the next train has a real status, or at least one service is cancelled. The second condition matters
   because when every listed train is cancelled there is no "next train", yet you still want to see them.
 - The table length follows **Departures to keep** and **Look-ahead window** in the integration's options.
+- **Column sizes** come from the `css:` block. Status and Left are set to `white-space: nowrap` with a
+  minimum width of `7em`, enough for the longest texts (`Cancelled`, `-12 min`, `1h 56 min`), so they never
+  break. Due and Exp are kept on one line too. Destination uses a smaller font (`0.85em`) and may wrap, so it
+  gives up space first. Change `0.85em` or `7em` if your screen needs different sizes. Each key is a CSS
+  selector for one column (`td:nth-child(2)` is the second).
 - To change a colour, edit the `color:` value in the Status column (`red`, `green`, `#ffa000`).
 
 **Note on "Left":** it is worked out in your browser each time the card redraws. The card redraws when the
