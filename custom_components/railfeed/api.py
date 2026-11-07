@@ -51,6 +51,10 @@ class RailFeedClient:
             params["date"] = day
         return await self._get("services", params)
 
+    async def async_get_stations(self) -> dict[str, Any]:
+        """Return every passenger station (CRS code and name) in one request."""
+        return await self._get("tiploc", {"stations_only": 1})
+
     async def _get(self, endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
         headers = {"X-Api-Key": self._api_key, "Accept": "application/json"}
         try:

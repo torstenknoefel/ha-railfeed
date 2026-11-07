@@ -28,6 +28,9 @@ DEFAULT_PASSENGER_ONLY = True
 # /api/services lookup is cached (RailFeed itself caches schedules for 15 min).
 CALLING_CACHE_SECONDS = 900
 
+# The list of stations behind the station pickers barely ever changes.
+STATIONS_CACHE_SECONDS = 86400
+
 
 def entry_key(crs: str, calling_at: str | None = None) -> str:
     """Identity of one setup: a station, optionally with a 'calling at' station.

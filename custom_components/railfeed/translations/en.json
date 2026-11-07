@@ -3,14 +3,21 @@
     "step": {
       "user": {
         "title": "Connect to RailFeed",
-        "description": "Create a free API key on your RailFeed account's API Keys page (railfeed.co.uk/api-keys), then enter the three-letter station code (CRS), e.g. BVD for Belvedere or KGX for London King's Cross.",
+        "description": "Create a free API key on your RailFeed account's API Keys page (railfeed.co.uk/api-keys) and enter it here. You'll choose your station by name on the next page.",
         "data": {
-          "api_key": "API key",
-          "station": "Station code (CRS)",
+          "api_key": "API key"
+        }
+      },
+      "station": {
+        "title": "Choose your station",
+        "description": "Start typing a station name (or its three-letter code) and pick it from the list. If you only want trains that stop at a particular station, pick that one under \"Only trains calling at\".",
+        "data": {
+          "station": "Station",
           "calling_at": "Only trains calling at (optional)"
         },
         "data_description": {
-          "calling_at": "Three-letter CRS code of a station on the train's route, e.g. ABW. Only trains that stop there after this station are listed, whether or not it is their final destination. Add the same station again with a different code to track several destinations."
+          "station": "The station whose departures you want, for example Belvedere.",
+          "calling_at": "A station on the train's route, for example Abbey Wood. Only trains that stop there after your station are listed, whether or not it is their final destination. Add the same station again with a different choice here to track several destinations."
         }
       },
       "reauth_confirm": {
@@ -23,8 +30,8 @@
     },
     "error": {
       "invalid_auth": "That API key was rejected.",
-      "invalid_station": "RailFeed doesn't recognise that station code. Use the three-letter CRS code.",
-      "invalid_calling_at": "Enter a single three-letter CRS code that RailFeed knows, different from the station above.",
+      "invalid_station": "RailFeed doesn't recognise that station. Pick one from the list or enter its three-letter code.",
+      "invalid_calling_at": "Pick a station that RailFeed knows from the list (or enter its three-letter code), different from your station.",
       "cannot_connect": "Couldn't reach RailFeed.",
       "rate_limited": "RailFeed rate limit reached. Try again in a minute.",
       "unknown": "Unexpected error talking to RailFeed."
@@ -51,16 +58,16 @@
           "scan_interval": "Minimum 30. RailFeed's feeds don't update faster than that.",
           "max_departures": "How many upcoming departures to include in the 'departures' attribute.",
           "passenger_only": "Hides freight, empty stock and charters.",
-          "calling_at": "Optional. Three-letter CRS code of a station on the train's route, e.g. ABW. Only trains that stop there after this station are listed, whether or not it is their final destination. Leave blank for all.",
-          "via": "Optional. Comma-separated CRS codes of stations that tell routes apart, e.g. GNW, LEW (up to 5). Trains calling at one of them get the word 'via' and the station name added to their destination, e.g. London Cannon Street via Greenwich. Leave blank for none.",
-          "destinations": "Optional. Comma-separated CRS codes of the train's final destination, e.g. KGX, EDB. Leave blank for all."
+          "calling_at": "Optional. A station on the train's route, for example Abbey Wood. Only trains that stop there after this station are listed, whether or not it is their final destination. Leave blank for all.",
+          "via": "Optional. Up to 5 stations that tell routes apart, for example Greenwich and Lewisham. Start typing a name to find them. Trains calling at one of them get the word 'via' and the station name added to their destination, e.g. London Cannon Street via Greenwich. Leave blank for none.",
+          "destinations": "Optional. Stations the train's final destination must be, for example King's Cross. Start typing a name to find them. Leave blank for all."
         }
       }
     },
     "error": {
-      "invalid_destinations": "Use comma-separated three-letter CRS codes, e.g. KGX, EDB.",
-      "invalid_calling_at": "Enter a single three-letter CRS code that RailFeed knows, different from this station.",
-      "invalid_via": "Use up to 5 comma-separated three-letter CRS codes that RailFeed knows, none of them this station or the 'calling at' station.",
+      "invalid_destinations": "Pick stations from the list or enter three-letter CRS codes.",
+      "invalid_calling_at": "Pick a station that RailFeed knows, different from this station.",
+      "invalid_via": "Pick up to 5 stations that RailFeed knows, none of them this station or the 'calling at' station.",
       "invalid_auth": "That API key was rejected.",
       "cannot_connect": "Couldn't reach RailFeed.",
       "rate_limited": "RailFeed rate limit reached. Try again in a minute.",
@@ -69,13 +76,27 @@
   },
   "entity": {
     "sensor": {
-      "next_departure": {"name": "Next departure"},
-      "next_destination": {"name": "Next destination"},
-      "next_platform": {"name": "Next platform"},
-      "next_delay": {"name": "Next delay"},
-      "next_status": {"name": "Next status"},
-      "delayed_services": {"name": "Delayed services"},
-      "cancelled_services": {"name": "Cancelled services"}
+      "next_departure": {
+        "name": "Next departure"
+      },
+      "next_destination": {
+        "name": "Next destination"
+      },
+      "next_platform": {
+        "name": "Next platform"
+      },
+      "next_delay": {
+        "name": "Next delay"
+      },
+      "next_status": {
+        "name": "Next status"
+      },
+      "delayed_services": {
+        "name": "Delayed services"
+      },
+      "cancelled_services": {
+        "name": "Cancelled services"
+      }
     }
   }
 }
