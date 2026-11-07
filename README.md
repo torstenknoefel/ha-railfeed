@@ -27,9 +27,14 @@ Copy `custom_components/railfeed` into your HA config folder's `custom_component
 
 1. Create a free account at <https://railfeed.co.uk>, then copy your key from
    <https://railfeed.co.uk/api-keys>.
-2. **Settings → Devices & services → Add integration → RailFeed**. Enter the key and the
-   three-letter station (CRS) code, e.g. `BVD` (Belvedere), `KGX` (King's Cross), `WIM` (Wimbledon).
-   Optionally add a **calling at** station (see below).
+2. **Settings → Devices & services → Add integration → RailFeed**. Enter your key.
+3. On the next page choose your station by name: click the box and start typing, for example `belv`, and the
+   list narrows to the matching stations (`Belvedere (BVD)`). You can also type the three-letter (CRS) code, e.g.
+   `BVD`, `KGX` (King's Cross) or `WIM` (Wimbledon).
+   Optionally choose a **calling at** station in the same way (see below).
+
+The list of stations comes from RailFeed and is cached for a day. If it can't be loaded, the boxes become plain
+text fields and you enter the three-letter codes instead.
 
 Add the integration again for each extra station, or for the same station with a different
 **calling at** station (one entry per station + destination pair; the same key can be reused).
@@ -54,14 +59,14 @@ It is excluded from the recorder database.
   limit is 60 requests/min per key).
 - **Departures to keep** (default 10), **look-ahead window** (default 2 h).
 - **Passenger trains only** (default on): hides freight, empty stock and charters.
-- **Only trains calling at this station**: optional CRS code of any station on the train's route, e.g. `ABW`.
+- **Only trains calling at this station**: optional station on the train's route, e.g. Abbey Wood (`ABW`).
   Chosen when you add the entry (it is what makes the entry unique); to change it, add a new entry and remove the old one.
   (Entries created with v0.2.x keep it here in the options.)
   Only trains that stop there *after* your station are listed, whether or not it is their final destination.
   Each train also gets `calling_at_arrival` (advertised arrival time there) and `journey_minutes` attributes.
   This costs one extra API request per 15 minutes per entry (the answer is cached). Each entry also polls
   the live board, and the limit is 60 requests/min per key, so a handful of entries is fine.
-- **Show route as "via" these stations**: optional, up to 5 comma-separated CRS codes, e.g. `GNW, LEW`.
+- **Show route as "via" these stations**: optional, up to 5 stations picked by name, e.g. Greenwich and Lewisham (`GNW`, `LEW`).
   Use it when the same destination is reached by different routes (for example London Cannon Street via
   Greenwich *or* via Lewisham). Every train that calls at one of these stations gets it appended to its
   destination: `London Cannon Street via Greenwich`. The rules are the same for every route:
@@ -71,7 +76,7 @@ It is excluded from the recorder database.
   The label is in the `destination` attribute and in the *Next destination* sensor; the plain name is kept in
   `destination_name` and the list of stations in `via`. Each via station costs one cached API request per
   15 minutes per entry. If that lookup fails, the board still works, just without the label.
-- **Destination filter**: optional CRS codes of the train's *final* destination, e.g. `KGX, EDB`.
+- **Destination filter**: optional stations the train's *final* destination must be, e.g. King's Cross and Edinburgh (`KGX`, `EDB`).
   Can be combined with the option above.
 
 ## Dashboard card
@@ -107,11 +112,10 @@ It is a separate dashboard card. In HACS open **Frontend**, search for **flex-ta
 
 ### 2. Set up the route and the "via" stations
 
-1. Add the integration with your station (example: `BVD`, Belvedere) and **Only trains calling at** `ABW`
-   (Abbey Wood). That lists every train from Belvedere that stops at Abbey Wood, wherever it is going.
+1. Add the integration with your station (example: Belvedere, `BVD`) and **Only trains calling at** Abbey Wood (`ABW`). That lists every train from Belvedere that stops at Abbey Wood, wherever it is going.
    (Leave it blank to list every train from your station.)
-2. Open the integration's **Configure** (cog) and set **Show route as 'via' these stations** to `GNW, LEW`
-   (Greenwich, Lewisham). Those trains, which end at London Cannon Street, now read *London Cannon Street via Greenwich* or
+2. Open the integration's **Configure** (cog) and set **Show route as 'via' these stations** to Greenwich and
+   Lewisham (`GNW`, `LEW`). Those trains, which end at London Cannon Street, now read *London Cannon Street via Greenwich* or
    *London Cannon Street via Lewisham*. Any other pair of routes works the same way: add a station that
    only one of the routes stops at.
 
