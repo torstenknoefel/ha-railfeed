@@ -222,7 +222,11 @@ def _parse_service(
     if passenger_only:
         if item.get("toc_type") not in ("PASSENGER", None):
             return None
-        if headcode[:1] not in ("1", "2"):  # drops 5x empty stock, freight etc.
+        # The first character of a headcode is the train class. Drop the classes that
+        # are never passengers: 0 light engine, 3 parcels, 4/6/7 freight, 5 empty
+        # stock, 8 departmental. Classes 1, 2 and 9 stay: 9 is used by passenger
+        # operators too (Thameslink, Eurostar), so it can't be treated as non-passenger.
+        if headcode[:1] in ("0", "3", "4", "5", "6", "7", "8"):
             return None
 
     destination_crs = item.get("destination_crs")
