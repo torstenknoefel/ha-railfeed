@@ -20,8 +20,19 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .board import BoardData
-from .const import ATTRIBUTION, DOMAIN
-from .coordinator import RailFeedConfigEntry, RailFeedCoordinator
+from .const import (
+    ATTRIBUTION,
+    CONF_DESTINATIONS,
+    CONF_HOURS,
+    CONF_MAX_DEPARTURES,
+    CONF_PASSENGER_ONLY,
+    CONF_VIA,
+    DEFAULT_HOURS,
+    DEFAULT_MAX_DEPARTURES,
+    DEFAULT_PASSENGER_ONLY,
+    DOMAIN,
+)
+from .coordinator import RailFeedConfigEntry, RailFeedCoordinator, parse_crs_list
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -46,6 +57,29 @@ def _next_departure_attrs(board: BoardData) -> dict[str, Any]:
         attrs.update(service.as_dict())
     attrs["departures"] = [s.as_dict() for s in board.services]
     return attrs
+
+
+def config_attributes(coordinator: RailFeedCoordinator) -> dict[str, Any]:
+    """The setup's configuration, as attributes (all prefixed ``config_``).
+
+    Added to every sensor so templates can read a setting from any entity, for
+    example the look-ahead window. Options changes reload the entry, so these
+    always match what is configured.
+    """
+    opts = coordinator.config_entry.options
+    interval = coordinator.update_interval
+    return {
+        "config_station": coordinator.crs,
+        "config_calling_at": coordinator.calling_at,
+        "config_via": sorted(parse_crs_list(opts.get(CONF_VIA)) or ()),
+        "config_destinations": sorted(parse_crs_list(opts.get(CONF_DESTINATIONS)) or ()),
+        "config_passenger_only": bool(opts.get(CONF_PASSENGER_ONLY, DEFAULT_PASSENGER_ONLY)),
+        "config_max_departures": int(opts.get(CONF_MAX_DEPARTURES, DEFAULT_MAX_DEPARTURES)),
+        "config_look_ahead_hours": int(opts.get(CONF_HOURS, DEFAULT_HOURS)),
+        "config_update_interval_seconds": (
+            int(interval.total_seconds()) if interval else None
+        ),
+    }
 
 
 SENSORS: tuple[RailFeedSensorDescription, ...] = (
@@ -119,6 +153,7 @@ class RailFeedSensor(CoordinatorEntity[RailFeedCoordinator], SensorEntity):
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
+        self._config_attrs = config_attributes(coordinator)
         self._attr_unique_id = f"{coordinator.entry_key.lower()}_{description.key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, coordinator.entry_key)},
@@ -134,7 +169,9 @@ class RailFeedSensor(CoordinatorEntity[RailFeedCoordinator], SensorEntity):
         return self.entity_description.value_fn(self.coordinator.data)
 
     @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
-        if self.entity_description.attrs_fn is None:
-            return None
-        return self.entity_description.attrs_fn(self.coordinator.data)
+    def extra_state_attributes(self) -> dict[str, Any]:
+        attrs: dict[str, Any] = {}
+        if self.entity_description.attrs_fn is not None:
+            attrs.update(self.entity_description.attrs_fn(self.coordinator.data))
+        attrs.update(self._config_attrs)
+        return attrs
