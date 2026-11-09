@@ -11,9 +11,22 @@ Live UK train departures for a station, from the free [RailFeed API](https://rai
 
 ## Install
 
-### HACS (recommended)
+### Marketplace (Home Assistant 2026.11 and newer)
 
-RailFeed is in the default HACS catalogue.
+RailFeed is in the Marketplace catalogue.
+
+1. In Home Assistant open **Settings → Marketplace** and search for **RailFeed**. The first time you open the
+   Marketplace you have to accept **I understand the risks and agree**.
+2. Open **RailFeed** and click **Install**. The setup starts straight away; continue with [Set up](#set-up) below.
+
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=torstenknoefel&repository=ha-railfeed&category=integration)
+
+If RailFeed doesn't show up in the search, choose **Add from link** in the Marketplace and enter
+`https://github.com/torstenknoefel/ha-railfeed`.
+
+### HACS (Home Assistant 2026.10 and older)
+
+Home Assistant versions before 2026.11 don't have the Marketplace; they use HACS. RailFeed is in the default HACS catalogue.
 
 1. In Home Assistant open **HACS** and search for **RailFeed**.
 2. Open it, click **Download**, and restart Home Assistant.
