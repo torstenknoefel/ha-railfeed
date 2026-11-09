@@ -31,8 +31,6 @@ Home Assistant versions before 2026.11 don't have the Marketplace; they use HACS
 1. In Home Assistant open **HACS** and search for **RailFeed**.
 2. Open it, click **Download**, and restart Home Assistant.
 
-[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=torstenknoefel&repository=ha-railfeed&category=integration)
-
 If RailFeed doesn't show up in the search (for example because your HACS is out of date), add it as a custom
 repository instead:
 
