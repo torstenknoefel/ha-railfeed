@@ -4,7 +4,7 @@
 
 # RailFeed for Home Assistant
 
-[![hacs][hacs-badge]][hacs-url] [![Validate](https://github.com/torstenknoefel/ha-railfeed/actions/workflows/validate.yml/badge.svg)](https://github.com/torstenknoefel/ha-railfeed/actions/workflows/validate.yml) [![Tests](https://github.com/torstenknoefel/ha-railfeed/actions/workflows/tests.yml/badge.svg)](https://github.com/torstenknoefel/ha-railfeed/actions/workflows/tests.yml)
+[![Marketplace: listed][hacs-badge]][hacs-url] [![Home Assistant 2025.3+](https://img.shields.io/badge/Home%20Assistant-2025.3%2B-41BDF5.svg)](https://www.home-assistant.io) [![Release](https://img.shields.io/github/v/release/torstenknoefel/ha-railfeed)](https://github.com/torstenknoefel/ha-railfeed/releases/latest) [![Validate](https://github.com/torstenknoefel/ha-railfeed/actions/workflows/validate.yml/badge.svg)](https://github.com/torstenknoefel/ha-railfeed/actions/workflows/validate.yml) [![Tests](https://github.com/torstenknoefel/ha-railfeed/actions/workflows/tests.yml/badge.svg)](https://github.com/torstenknoefel/ha-railfeed/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/github/license/torstenknoefel/ha-railfeed)](LICENSE)
 
 Live UK train departures for a station, from the free [RailFeed API](https://railfeed.co.uk/docs)
 (built on Network Rail TRUST/Darwin feeds).
@@ -356,5 +356,5 @@ pip install pytest
 pytest          # parser tests, no Home Assistant needed
 ```
 
-[hacs-badge]: https://img.shields.io/badge/HACS-Default-41BDF5.svg
+[hacs-badge]: https://img.shields.io/badge/Marketplace-listed-41BDF5.svg
 [hacs-url]: https://hacs.xyz
