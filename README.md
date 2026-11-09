@@ -13,11 +13,19 @@ Live UK train departures for a station, from the free [RailFeed API](https://rai
 
 ### HACS (recommended)
 
-1. In Home Assistant open **HACS → ⋮ → Custom repositories**.
-2. Add `https://github.com/torstenknoefel/ha-railfeed` with category **Integration**.
-3. Search for **RailFeed**, download it, and restart Home Assistant.
+RailFeed is in the default HACS catalogue.
+
+1. In Home Assistant open **HACS** and search for **RailFeed**.
+2. Open it, click **Download**, and restart Home Assistant.
 
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=torstenknoefel&repository=ha-railfeed&category=integration)
+
+If RailFeed doesn't show up in the search (for example because your HACS is out of date), add it as a custom
+repository instead:
+
+1. Open **HACS → ⋮ → Custom repositories**.
+2. Add `https://github.com/torstenknoefel/ha-railfeed` with category **Integration**.
+3. Search for **RailFeed**, download it, and restart Home Assistant.
 
 ### Manual
 
@@ -53,7 +61,34 @@ The `departures` attribute on **Next departure** is a list of dicts with `destin
 `expected_time`, `platform`, `status`, `delay_minutes`, `operator`, `cancel_reason`, `late_reason`, `coaches`, etc.
 It is excluded from the recorder database.
 
+### Attributes
+
+**Every sensor also carries your configuration as attributes, all starting with `config_`**, so a template or
+card can read a setting from any entity without you repeating it by hand:
+
+| Attribute | Example | Setting |
+|---|---|---|
+| `config_station` | `BVD` | Station |
+| `config_calling_at` | `ABW` | Only trains calling at |
+| `config_via` | `["GNW", "LEW"]` | Show route as "via" these stations |
+| `config_destinations` | `["KGX", "EDB"]` | Only trains to these destinations |
+| `config_passenger_only` | `true` | Passenger trains only |
+| `config_max_departures` | `10` | Departures to keep |
+| `config_look_ahead_hours` | `2` | Look-ahead window (hours) |
+| `config_update_interval_seconds` | `60` | Update interval (seconds) |
+
+For example, the look-ahead window in a template:
+
+```jinja
+{{ state_attr('sensor.belvedere_to_abbey_wood_next_status', 'config_look_ahead_hours') }}
+```
+
+**See the [attribute reference](docs/attributes.md)** for every attribute of every sensor, with types, examples
+and what each one means.
+
 ## Options (cog icon on the integration)
+
+All of these are available as `config_*` attributes (see [Attributes](#attributes)).
 
 - **Update interval**: default 60 s, minimum 30 s (RailFeed asks for no more than one poll per 30 s;
   limit is 60 requests/min per key).
@@ -263,10 +298,17 @@ conditions:
 card:
   type: markdown
   title: 'Train: Belvedere → Abbey Wood'
-  content: No trains to Abbey Wood in the look-ahead window.
+  content: >-
+    {% set h = state_attr('sensor.belvedere_to_abbey_wood_next_status', 'config_look_ahead_hours') | int(2) %}
+    No trains to Abbey Wood in the next {{ h }} hour{{ '' if h == 1 else 's' }}.
 ```
 
 With a list of `conditions`, *all* of them must hold; the first card needed `or` to show on *either*.
+
+The message takes the look-ahead window from the `config_look_ahead_hours` attribute, so it stays correct when
+you change **Look-ahead window** in the integration's options: with the default it reads
+*No trains to Abbey Wood in the next 2 hours.* The `| int(2)` is a fallback in case the attribute is missing.
+Every RailFeed sensor has this attribute, so any of them works here.
 
 ### Tips
 
@@ -314,5 +356,5 @@ pip install pytest
 pytest          # parser tests, no Home Assistant needed
 ```
 
-[hacs-badge]: https://img.shields.io/badge/HACS-Custom-orange.svg
+[hacs-badge]: https://img.shields.io/badge/HACS-Default-41BDF5.svg
 [hacs-url]: https://hacs.xyz
